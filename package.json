@@ -1,0 +1,32 @@
+{
+  "name": "design-house",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-only Claude.ai Design Artifact replica — powered by claude CLI subprocess",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "dev:backend": "pnpm --filter @design-house/backend dev",
+    "dev:frontend": "pnpm --filter @design-house/frontend dev",
+    "dev": "concurrently -n backend,frontend -c blue,green \"pnpm dev:backend\" \"pnpm dev:frontend\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}

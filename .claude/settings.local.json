@@ -10,7 +10,14 @@
       "Bash(git -C \"D:/sideprojct/Design_house\" init -b main)",
       "Bash(git -C \"D:/sideprojct/Design_house\" config --get user.name)",
       "Bash(git -C \"D:/sideprojct/Design_house\" config --get user.email)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(pnpm --version)",
+      "Bash(claude --version)",
+      "Bash(corepack --version)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm -r typecheck)"
     ]
   }
 }
