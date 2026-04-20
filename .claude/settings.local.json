@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(claude plugin *)",
+      "Bash(mkdir -p \"C:/Users/user/.claude/local-marketplaces/ddd-workflow-mp/plugins\")",
+      "Bash(git clone *)",
+      "Bash(git -C \"D:/sideprojct/Design_house\" status)",
+      "Bash(git -C \"D:/sideprojct/Design_house\" init -b main)",
+      "Bash(git -C \"D:/sideprojct/Design_house\" config --get user.name)",
+      "Bash(git -C \"D:/sideprojct/Design_house\" config --get user.email)",
+      "Bash(git *)"
+    ]
+  }
+}

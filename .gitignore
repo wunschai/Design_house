@@ -1,0 +1,39 @@
+# === Runtime data (user's design artifacts + local DB) ===
+projects/
+.data/
+
+# === Node / TS ===
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# === Secrets / local config ===
+.env
+.env.local
+.env.*.local
+
+# === Editor / OS ===
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# === Logs ===
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# === Temp / drafts ===
+.tmp-*
+*.tmp
+
+# === Test artifacts ===
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
