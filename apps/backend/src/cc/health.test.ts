@@ -59,12 +59,12 @@ describe("checkCcHealth", () => {
     }
   });
 
-  it("should return CC_NOT_AUTHENTICATED when CC is not logged in", () => {
+  // 註：登入檢測刻意不在 checkCcHealth 做（避免阻塞啟動）。
+  // 登入失敗會由 spawner.ts 的 stderr handler 捕到「Please run claude login」
+  // 並 WS broadcast CC_NOT_AUTHENTICATED 給 UI。
+  it("should return ok:true even when CC would fail auth — auth is verified lazily at spawn time", () => {
     makeFakeCC("Claude Code 2.1.0", "Please run claude login");
     const status = checkCcHealth();
-    expect(status.ok).toBe(false);
-    if (!status.ok) {
-      expect(status.code).toBe("CC_NOT_AUTHENTICATED");
-    }
+    expect(status.ok).toBe(true);
   });
 });

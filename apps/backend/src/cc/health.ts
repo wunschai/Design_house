@@ -37,28 +37,9 @@ export function checkCcHealth(): HealthStatus {
     };
   }
 
-  // 2. 驗證 CC 是否已登入（短 ping）
-  try {
-    const result = execSync(`"${cc}" -p "ok"`, { stdio: "pipe", timeout: 15000, shell: EXEC_SHELL ? "cmd.exe" : undefined });
-    const output = result.toString();
-    if (output.includes("Please run claude login") || output.includes("not authenticated")) {
-      return {
-        ok: false,
-        code: "CC_NOT_AUTHENTICATED",
-        message: "claude CLI not authenticated. Please run: claude login",
-      };
-    }
-  } catch (e) {
-    const stderr = (e as { stderr?: Buffer }).stderr?.toString() ?? "";
-    if (stderr.includes("Please run claude login") || stderr.includes("not authenticated")) {
-      return {
-        ok: false,
-        code: "CC_NOT_AUTHENTICATED",
-        message: "claude CLI not authenticated. Please run: claude login",
-      };
-    }
-    // 其他錯誤（如 network timeout）— 不視為安裝失敗，繼續啟動
-  }
-
+  // 登入檢測故意不在啟動時做（會阻塞 5-15s、違反 NFR-11 的 3s 啟動上限、
+  // 且導致 Vite proxy 在 backend 尚未 listen 期間 ECONNREFUSED）。
+  // 登入失敗會在 spawner 的 stderr handler 捕到「Please run claude login」字串
+  // 並主動 WS broadcast CC_NOT_AUTHENTICATED，使用者第一次送訊息時就會看到 toast。
   return { ok: true };
 }

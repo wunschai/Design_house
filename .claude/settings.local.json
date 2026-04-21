@@ -53,7 +53,12 @@
       "Bash(npx lint-staged *)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('exports:', list\\(d.get\\('exports',{}\\).keys\\(\\)\\)[:20]\\); print\\('main:', d.get\\('main'\\)\\); print\\('types:', d.get\\('types'\\)\\)\"5)",
       "Bash(node *)",
-      "Bash(2>&1)"
+      "Bash(2>&1)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 18852 //F)",
+      "Bash(taskkill //IM node.exe //F)",
+      "Bash(curl -sS -o /dev/null -w \"status=%{http_code}\\\\n\" -X POST http://127.0.0.1:31823/internal/mcp-event -H \"content-type:application/json\" -d '{}')",
+      "Bash(curl -sS -o /dev/null -w \"status=%{http_code}\\\\n\" -X POST http://127.0.0.1:31823/internal/mcp-event -H \"content-type:application/json\" -H \"x-internal-token:WRONG\" -d '{}')"
     ]
   }
 }
