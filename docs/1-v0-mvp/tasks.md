@@ -244,8 +244,8 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 4.4**（S）：Backend 重啟持久化測試 — 關 backend → 重啟 → 確認同上（AC-6.2）
 - [ ] **Task 4.5**（S）：錯誤場景測試 — 手動 rename `claude` binary（或 PATH 移除）重啟 backend，確認 UI 顯示安裝指引（AC-7.1）
 - [ ] **Task 4.6**（S）：Port 衝突測試 — 另開一個服務占 31823，確認 backend fail-fast + 建議訊息（AC-7.5）
-- [ ] **Task 4.7**（M）：Playwright smoke 腳本測試 (Red) — 自動化覆蓋以下 AC：AC-1.1（port 啟動）、AC-1.2（僅綁 127.0.0.1，用 `netstat`/`ss` assert）、AC-1.3（三欄 ≤ 3s 渲染）、AC-2.1（首次預設專案）、AC-3.1（busy indicator 500ms）、AC-3.3（≥ 2 個 chat-delta event）、AC-3.5（write_file 後 file tree 更新）、AC-4.1（show_to_user iframe navigate）、AC-6.1（關頁重開還原）、AC-7.5（port 衝突 fail-fast，另起一 server 佔 31823 後啟動主 backend assert exit code ≠ 0）
-- [ ] **Task 4.8**（M）：Playwright smoke 實作 (Green) — 含 `pnpm install -D @playwright/test` + `playwright install chromium`、跑 `pnpm test:e2e` 綠燈
+- [x] **Task 4.7**（M）：Playwright smoke 腳本測試 (Red) — 自動化覆蓋以下 AC：AC-1.1（port 啟動）、AC-1.2（僅綁 127.0.0.1，用 `netstat`/`ss` assert）、AC-1.3（三欄 ≤ 3s 渲染）、AC-2.1（首次預設專案）、AC-3.1（busy indicator 500ms）、AC-3.3（≥ 2 個 chat-delta event）、AC-3.5（write_file 後 file tree 更新）、AC-4.1（show_to_user iframe navigate）、AC-6.1（關頁重開還原）、AC-7.5（port 衝突 fail-fast，另起一 server 佔 31823 後啟動主 backend assert exit code ≠ 0）
+- [x] **Task 4.8**（M）：Playwright smoke 實作 (Green) — 含 `pnpm install -D @playwright/test` + `playwright install chromium`、跑 `pnpm test:e2e` 綠燈
 - [ ] **Task 4.9**（M）：**自動化 + 人工雙軌 AC 驗收**
   - 自動部分：`pnpm test:e2e` 全綠視為自動 AC（Task 4.7 列出的 10 條）自動 tick
   - **Parser skip 行為（unit test 層）**：驗 Task 3.C.19-20 產出的 parser unit test 涵蓋 `rate_limit_event` / `thinking` / `tool_use.caller` / `error_max_turns` / `raw_log` 寫入等列，作為 ADR-004 隱性 AC 的替代

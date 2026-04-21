@@ -220,6 +220,7 @@ export default function Chat({ projectSlug, ws }: ChatProps) {
           disabled={is_busy}
           className="flex-1"
           aria-label="訊息輸入"
+          data-testid="chat-input"
         />
         {is_turn_active ? (
           <Button

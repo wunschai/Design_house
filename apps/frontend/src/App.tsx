@@ -244,30 +244,36 @@ function AppInner({
         <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
           {/* 左：檔案樹 */}
           <ResizablePanel defaultSize={20} minSize={10} aria-label="檔案樹面板">
-            <FileTree
-              projectSlug={current_slug}
-              ws={ws}
-              onSelect={(path) => onSetPreviewPath(path)}
-            />
+            <div data-testid="panel-file-tree" className="h-full">
+              <FileTree
+                projectSlug={current_slug}
+                ws={ws}
+                onSelect={(path) => onSetPreviewPath(path)}
+              />
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
 
           {/* 中：對話 */}
           <ResizablePanel defaultSize={50} minSize={25} aria-label="對話面板">
-            <Chat projectSlug={current_slug} ws={ws} />
+            <div data-testid="panel-chat" className="h-full">
+              <Chat projectSlug={current_slug} ws={ws} />
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
 
           {/* 右：預覽 */}
           <ResizablePanel defaultSize={30} minSize={15} aria-label="預覽面板">
-            <Preview
-              projectSlug={current_slug}
-              currentPath={preview_path}
-              ws={ws}
-              onPathChange={onSetPreviewPath}
-            />
+            <div data-testid="panel-preview" className="h-full">
+              <Preview
+                projectSlug={current_slug}
+                currentPath={preview_path}
+                ws={ws}
+                onPathChange={onSetPreviewPath}
+              />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (
