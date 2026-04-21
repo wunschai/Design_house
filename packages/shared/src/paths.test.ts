@@ -1,6 +1,6 @@
 // @design-house/shared/paths.test.ts
 import { describe, it, expect } from "vitest";
-import { toPosix, isSafeRelativePath, joinProject } from "./paths.js";
+import { toPosix, isSafeRelativePath, joinProject, PathTraversalError } from "./paths.js";
 
 // ── toPosix ───────────────────────────────────────────────────────
 
@@ -176,5 +176,21 @@ describe("joinProject", () => {
 
   it("should throw on null byte in path", () => {
     expect(() => joinProject("/projects/my-project", "file\0.html")).toThrow();
+  });
+
+  it("should throw PathTraversalError instance (for instanceof discrimination)", () => {
+    let caught: unknown;
+    try {
+      joinProject("/projects/my-project", "../escape");
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(PathTraversalError);
+    expect(caught).toBeInstanceOf(Error);
+    if (caught instanceof PathTraversalError) {
+      expect(caught.code).toBe("PATH_TRAVERSAL");
+      expect(caught.name).toBe("PathTraversalError");
+      expect(caught.message).toContain("PATH_TRAVERSAL");
+    }
   });
 });

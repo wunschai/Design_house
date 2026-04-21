@@ -1,6 +1,15 @@
 # Works: v0 MVP — 實作日誌
 
 > 由 `/ddd.work` 維護，記錄每個 milestone 的技術決策、問題解決與與 spec 的偏差。
+>
+> **最新決策索引**：M1 是否結束 = M1 v3 再延伸 spike 的結論為最終版本。ADR / tasks / packages/shared 以此為 SSOT；v1/v2 保留為歷史紀錄、決策演化軌跡。Round-3 xreview 後的細部修正見 M1 v4（本檔末尾）。
+>
+> 章節時間序：
+> - §M0：2026-04-21，scaffold
+> - §M1 v1：2026-04-21，初版 spike（後因 xreview 判定樣本不足）
+> - §M1 v2：2026-04-21，延伸 spike（OQ-4/5 新增 + 持續風險記錄）
+> - §M1 v3：2026-04-21，再延伸 spike（persona stickiness + 文件一致性）
+> - §M1 v4：2026-04-21，round-3 xreview 細部修正（🔴×3 + 🟡×7）
 
 ---
 
@@ -188,3 +197,31 @@ v1: ~16 min + v2: ~25 min + 文件回修: ~20 min = ~61 min 總累計，仍在 0
 
 ### 耗時（累計）
 v1: ~16 + v2: ~25 + 文件回修: ~20 + v3 spike: ~10 + v3 文件回修: ~30 = **~101 min** 累計，仍在 0.5-1 d timebox 內。
+
+---
+
+## M1 v4 round-3 xreview 細部修正 — 2026-04-21
+
+### 背景
+Round-3 xreview 發現 3🔴 + 7🟡，都是 **細部校正**而非架構問題：spec 例子數字錯、tasks.md 一條 29+ 漏換、iframe hook 缺範例、ADR-010 沒寫 TTL、paths.ts 用字串錯誤判斷不夠 robust、§3.5 `done` 的 `ok:boolean` 語意模糊等。使用者決議「除了共識外都要修」。
+
+### 🔴 修正（3）
+1. spec AC-3.0 例子數字：「3×2 + 9 = 15」→ 正解「3 CJK × 2 + 1 空格 + 6 ASCII = 13」；並指向 `@design-house/shared/weighted-length` 的 `isShortConceptualPrompt` helper 避免各 app 自寫分歧計數
+2. tasks.md:24「29+ AC」→「34 條 AC」
+3. Task 3.D.13 Preview panel 加具體 hook 範例：`iframe.onLoad` 時重掛 `addEventListener('error', ...)` + wrap `console.error`，明述 per-load re-attach、artifact 覆寫風險、5s load timeout fallback
+
+### 🟡 修正（7）
+4. ADR-010 cache 規格補齊：Map<id, {resolvedResponse?, pendingUntil}>、TTL 60s、容量 1000 LRU、遲到 ack log+drop 不重廣播、backend 重啟期間行為明述（v0 可接受）
+5. §邊界案例 #14 補充：連續 3 次 done-request 的 UI FIFO 規則（相同 turn 內 single-thread）
+6. paths.ts 新增 `class PathTraversalError extends Error`（含 `code: "PATH_TRAVERSAL"`），`joinProject` 改 throw instance；handler 用 `instanceof` 判斷，不再靠字串前綴。+1 test
+7. §3.5 `done` 補 `ok:boolean` 語意節：`ok:true` 仍可能含 errors（AC-4.4 情境）；`ok:false` **僅**代表 backend timeout。CC retry loop 觸發條件是 `consoleErrors.length > 0`，不是 `!ok`
+8. works.md 檔頭加「最新決策索引」+ 章節時間序（本節）
+9. README.md 新增（根目錄）：run 指令、系統前置條件、Node 22 LTS = supported / Node 25 = best-effort
+10. （暫未修）events.ts 全 `.strict()` — Round-3 共識認可跳過（WS 事件 backend 內部生成、信任邊界不同）
+
+### 驗收
+- shared 測試：192 → 192 passed / 0 failed（paths +1、無 regression）
+- pnpm -r typecheck：4/4 綠
+
+### 累計耗時
+v1~v3 + 文件回修 ~101 + v4 round-3 文件修 ~15 = **~116 min** 累計。

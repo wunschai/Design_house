@@ -68,7 +68,7 @@ v0 **不**涵蓋下列（皆列於 `PRD.md` 的 Out of MVP，延到 v1+）：
 - [ ] **AC-2.4**：專案 slug 由使用者輸入的 name 產生（規範化為 kebab-case），碰撞時 suffix `-2`、`-3`
 
 **對話與 CC 整合**
-- [ ] **AC-3.0 (Understand)**：使用者在 project 中首次發送（`sessions.cc_session_id` 為 null 時的第一則訊息）若為概念性敘述（heuristic：**加權字元數 < 60**，其中 CJK 字元各計 2、ASCII 字元各計 1，例如「做一個 button」= 3×2 + 9 = 15），CC 的第一則回覆必須是**純文字發問**（2-5 個問題），而非直接開始 write_file。違反此 AC 的 turn 視為 fail。
+- [ ] **AC-3.0 (Understand)**：使用者在 project 中首次發送（`sessions.cc_session_id` 為 null 時的第一則訊息）若為概念性敘述（heuristic：**加權字元數 < 60**，其中 CJK 字元各計 2、ASCII 字元各計 1，例如「做一個 button」= 3 CJK × 2 + 1 空格 + 6 ASCII = **13**），CC 的第一則回覆必須是**純文字發問**（2-5 個問題），而非直接開始 write_file。違反此 AC 的 turn 視為 fail。實作使用 `@design-house/shared/weighted-length` 的 `isShortConceptualPrompt(s, 60)`，避免各處自寫 counter 分歧。
 - [ ] **AC-3.1**：Chat 欄送出訊息 → ≤ 500ms 內 UI 顯示「AI 思考中」指示（避免死白）
 - [ ] **AC-3.2**：Backend spawn 的 CC 進程載入 subagent `design-artifact`，CC 第一則回覆不得以「I'm Claude Code」、「As Claude Code」、「I am Claude Code」等自我指稱開頭；不得提及系統 prompt、subagent 設定、MCP 等技術細節
 - [ ] **AC-3.3**：CC 的助理文字以串流形式逐段出現（非完整一次噴出）
@@ -240,6 +240,11 @@ errors: PATH_TRAVERSAL
 ```
 **同步阻塞**：mcp-server 發 HTTP POST 到 backend → backend 廣播 `done-request {correlationId}` → 等 UI 的 `done-ack {correlationId}` → 至多 5s 超時。超時回 `{ok:false, timedOut:true, consoleErrors:[]}`。
 
+**`ok` 語意澄清**：
+- `ok: true`：UI 成功 ack（iframe 順利 load，或 load 5s 超時後 UI 明確 ack `{loaded:false}`）。**`ok:true` 下 `consoleErrors` 仍可能非空**——AC-4.4 情境（頁面載入成功但 runtime 有 JS 錯誤）
+- `ok: false`：**僅**當 backend 未在 5s 內收到 UI ack（整條 pipeline 超時）。對應 `timedOut:true`
+- CC persona（ADR-005 規則 3）的 retry loop 觸發條件是 **`consoleErrors.length > 0`**（無論 ok），不是 `ok:false`。`ok:false` 代表本地 pipeline 故障，CC 應在 summary 回報給使用者而非無限 retry
+
 ### 4. `/internal/mcp-event`（mcp-server ↔ backend，HTTP POST，綁 127.0.0.1）
 
 **Request：**
@@ -347,7 +352,7 @@ SQLite 以 WAL mode 運行（`PRAGMA journal_mode=WAL`）。`raw_log` 僅對**�
 11. **mcp-server 呼叫 backend 失敗**（backend crash 或網路異常）：2 次 200ms 退避重試後失敗 → MCP 回 CC `isError: true, content:[{type:"text", text:"backend unreachable"}]`，CC 可決定是否放棄或重試。
 12. **assistant 單則 delta > 64 KB**：backend 把 delta 拆成 ≤ 16 KB 的 chunks 依序 WS 送出。
 13. **檔案 rename**：chokidar 先發 `unlink` 再發 `add`、短時間內（≤ 100ms）同 path 被 add 視為 rename，backend dedupe 發一則 `fs-change {op:"rename"}`。
-14. **同輪 `done` 與 `show_to_user` 交錯呼叫**：UI 以 FIFO 處理，但 `done-request` 不會被後續的 `show-to-user` 打斷（UI 一律先完成 done 才處理下一個）。
+14. **同輪 `done` 與 `show_to_user` 交錯呼叫**：UI 以 FIFO 處理，但 `done-request` 不會被後續的 `show-to-user` 打斷（UI 一律先完成 done 才處理下一個）。**連續 3 次 done-request 串列**（AC-4.6 auto-fix loop 最多 3 次）：correlationId 皆不同，UI 依 arrival order FIFO 處理每個、不可 short-circuit；同時**同一 turn 不可能並發兩個 done**（single turn 單緒呼叫）。
 15. **專案 slug 字元非 ASCII**：slug 正規化把 CJK 轉成 `project-<timestamp>`；name 欄位仍保留原字串。
 16. **兩個 project 同時 turn（未來 v1+ 支援，v0 不支援）**：v0 全域 single-flight，第二個專案的 send → `TURN_ALREADY_ACTIVE`。
 17. **/internal/mcp-event body > 10 MB（NFR-6 上限）**：Fastify `bodyLimit: 10*1024*1024`，超標回 HTTP 413；mcp-server 端應先拒絕 `write_file` 的 content > 5 MB（NFR-8 + `CONTENT_TOO_LARGE` error），防走到 10 MB 上限。
@@ -672,12 +677,20 @@ tools:
 - backend 的 `/internal/mcp-event` handler 維護 in-memory `Map<correlationId, Pending>`，收到 `done` tool 請求時註冊 pending、廣播 `done-request{correlationId}` 到 WS、等 UI `done-ack{correlationId}` 或 5s timeout
 - backend **對重複 `correlationId` 做 idempotency**：若同個 id 二次進來（mcp-server HTTP retry 造成），第二次以 cached response 回覆、不重複廣播
 
+**Idempotency cache 具體要求**：
+- 資料結構：`Map<correlationId, { resolvedResponse?: DoneOutput, pendingUntil: number }>`（記憶體內）
+- **TTL**：entry 於最後一次存取後 60s 清除（>> done 5s 超時、涵蓋 mcp-server 2× retry + margin）
+- **容量上限**：1000 entries（超過時以 insertion order 淘汰最舊）。v0 單使用者、同 turn 至多 3 個 correlationId，遠遠無虞
+- **遲到 ack 處理**：若 UI 送 `done-ack{correlationId}` 但 pending 已被 TTL 清或已 timeout resolved → backend log warn + 丟棄、不重廣播、不回溯 resolve
+- **backend 在 pending 期間重啟**：整個 map 喪失。此時 mcp-server 的 HTTP POST 早已 timeout（5s 內 backend 重啟通常來不及 ack），其 tool call 自然回 `{ok:false, timedOut:true}`；若 backend 先 cached response 再重啟，mcp-server 重試會被當作新請求重新廣播——**v0 可接受**（dev hot-reload 情境極少見、使用者會看到重複的 done preview 可手動刷新），prod-style 部署再視需要加 disk-backed cache
+
 **Consequences.**
 - ✅ 單一生成點、單一 dedupe 點，邏輯清楚
 - ✅ ULID 時間序＋字典序，debug 時易排序
 - ✅ backend idempotency 保護：mcp-server HTTP callback retry（2× 200ms 退避）不會觸發重複 `done-request` 廣播
+- ✅ TTL + 容量上限防 memory leak；遲到 ack 有明確行為不會隱性崩潰
 - ⚠️ mcp-server 需 `ulid` dep（apps/mcp-server/package.json 已裝）
-- ⚠️ idempotency cache 只在單 process lifetime 有效，backend 重啟則清空；v0 可接受（重啟期間無待處理 done）
+- ⚠️ idempotency cache 只在單 process lifetime 有效，backend 重啟則清空；v0 可接受（見「重啟期間」條目）
 
 **Alternatives rejected.** Backend 生 id 後回傳給 mcp-server（多一 round-trip）；CC 提供 tool_use_id（每個工具不同 id、done retry 時 tool_use_id 相同也會混淆）；UUID v4（無時間序）。
 

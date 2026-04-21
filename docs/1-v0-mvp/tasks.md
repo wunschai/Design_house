@@ -21,7 +21,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 **AC 覆蓋規劃**（34 條 AC 全數對應到 task）：
 - M0：AC-1.4 (SQLite schema 預備)
 - M2：其他 28 條 AC 分散到四條工作線
-- M3：對 spec 29+ AC 逐條勾選
+- M3：對 spec 34 條 AC 逐條勾選
 
 ---
 
@@ -176,7 +176,29 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 3.D.10**（S）：FileTree panel 測試 (Red) — GET files 初始載入、fs-change 增量更新、點檔 → trigger preview navigate
 - [ ] **Task 3.D.11**（S）：FileTree panel 實作 (Green)
 - [ ] **Task 3.D.12**（S）：Preview panel 測試 (Red) — iframe navigate on show_to_user、done-request 時 iframe.load → 3s 視窗內收集 `window.onerror` + `console.error` → 送 done-ack（含 correlationId）
-- [ ] **Task 3.D.13**（M）：Preview panel 實作 (Green) — iframe 以 `src="/api/projects/:slug/files/:path"` 載入（same-origin 於 UI）+ `sandbox="allow-scripts allow-same-origin"`（見 spec §4.1）；mount 時 attach `contentWindow.onerror` 與 `contentWindow.console.error` hooks 收 runtime errors；done-request 收到時 iframe.load + 3s 視窗內收集後送 `done-ack`；load 超過 5s 未觸發 → ack `{loaded:false}` 並顯示 fallback
+- [ ] **Task 3.D.13**（M）：Preview panel 實作 (Green) — iframe 以 `src="/api/projects/:slug/files/:path"` 載入（same-origin 於 UI）+ `sandbox="allow-scripts allow-same-origin"`（見 spec §4.1）。Hook 掛載範例：
+  ```tsx
+  // 每次 src 變更 → iframe 重新載入 → onLoad 觸發 → 重掛 hooks
+  <iframe ref={iframeRef} onLoad={() => {
+    const win = iframeRef.current?.contentWindow; if (!win) return;
+    const errs: string[] = [];
+    // 'error' listener 較 robust：artifact 腳本無法覆寫 addEventListener 內部註冊
+    win.addEventListener("error", (e: ErrorEvent) => {
+      errs.push(`${e.message} (${e.filename}:${e.lineno}:${e.colno})`);
+    });
+    // console.error 監聽（以 defineProperty 包一層；若 artifact 後來再覆寫，至少前 3s 窗捕捉有效）
+    const origErr = win.console.error.bind(win.console);
+    win.console.error = (...args: unknown[]) => {
+      errs.push(args.map(String).join(" "));
+      origErr(...args);
+    };
+    errsRef.current = errs;  // 供 done-ack 取用
+  }} />
+  ```
+  - **必須 per-load 重新 attach**（iframe src 變更觸發 load）；不可一次 attach 終身
+  - **artifact 後覆寫 console** 的風險：用 `addEventListener('error', …)` 主要抓 uncaught exceptions；`console.error` 封裝只在 3s 收集窗期間必要
+  - load 超過 **5s 未觸發** → ack `{loaded:false, consoleErrors:[]}` 並顯示 fallback 訊息（計入 AC-4.5 timeout 分支）
+  - done-request 收到時，記下 start 時戳、等 onLoad、load 後繼續收 3s 內的 error，視窗結束 flush `done-ack{correlationId, loaded:true, consoleErrors}`
 - [ ] **Task 3.D.14**（S）：App.tsx 三欄 layout 測試 (Red) — 佈局結構、project switcher 位置
 - [ ] **Task 3.D.15**（S）：App.tsx 實作 (Green) — shadcn `Resizable` 三欄 + 頂部 project switcher + error toast
 - [ ] **Task 3.D.16**（S）：Bootstrap `pnpm dev` 自動開啟瀏覽器（concurrently / open）— 對應 AC-1.3「瀏覽器打開 → ≤ 3s 顯示」
