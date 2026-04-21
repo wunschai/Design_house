@@ -58,7 +58,15 @@
       "Bash(taskkill //PID 18852 //F)",
       "Bash(taskkill //IM node.exe //F)",
       "Bash(curl -sS -o /dev/null -w \"status=%{http_code}\\\\n\" -X POST http://127.0.0.1:31823/internal/mcp-event -H \"content-type:application/json\" -d '{}')",
-      "Bash(curl -sS -o /dev/null -w \"status=%{http_code}\\\\n\" -X POST http://127.0.0.1:31823/internal/mcp-event -H \"content-type:application/json\" -H \"x-internal-token:WRONG\" -d '{}')"
+      "Bash(curl -sS -o /dev/null -w \"status=%{http_code}\\\\n\" -X POST http://127.0.0.1:31823/internal/mcp-event -H \"content-type:application/json\" -H \"x-internal-token:WRONG\" -d '{}')",
+      "Bash(curl -sS -m 3 http://127.0.0.1:31823/health)",
+      "Bash(curl -sS -m 3 http://127.0.0.1:31823/api/projects)",
+      "Bash(sqlite3 .data/design_house.db \"SELECT severity, reason, substr\\(raw,1,200\\) FROM raw_log ORDER BY id DESC LIMIT 10\")",
+      "Bash(sqlite3 .data/design_house.db \"SELECT role, substr\\(content,1,200\\), is_error FROM messages ORDER BY created_at DESC LIMIT 10\")",
+      "Bash(tasklist //FI \"IMAGENAME eq claude.exe\")",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
+      "Bash(tasklist //V //FI \"IMAGENAME eq claude.exe\")",
+      "Bash(wmic process *)"
     ]
   }
 }

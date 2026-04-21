@@ -38,12 +38,29 @@ export async function spawnCc(opts: SpawnCcOptions): Promise<void> {
   const port = process.env["PORT"] ?? "31823";
 
   // 組裝命令（ADR-002）
+  // 關鍵組合（M3 smoke 實測後修正）：
+  //   --permission-mode bypassPermissions：允許 tool 呼叫免 prompt（原 `dontAsk` 是「不問=拒絕」）
+  //   --tools ""：停用所有 CC 內建工具（Bash/Read/Write/Edit 等）
+  //   --mcp-config + --strict-mcp-config：唯一的 tool 來源是我方 MCP server
+  //   --agent design-artifact：套 persona（system prompt），實測 `tools:` YAML 欄位
+  //                          在 `--agent` 模式下只是 hint、不強制限制，改靠 --tools 斷根
+  //   --disallowedTools 補鎖 CC 的 planning / memory / scheduler 系列（以防未來版本）
   const args: string[] = [
     "--print",
     "--agent", "design-artifact",
     "--mcp-config", "./.mcp.json",
     "--strict-mcp-config",
-    "--permission-mode", "dontAsk",
+    "--tools", "",
+    "--disallowedTools",
+      "Bash", "Read", "Write", "Edit", "MultiEdit",
+      "Glob", "Grep", "Task", "WebSearch", "WebFetch",
+      "TodoWrite", "ExitPlanMode", "NotebookEdit",
+      "AskUserQuestion", "Skill", "ToolSearch",
+      "EnterPlanMode", "EnterWorktree", "ExitWorktree",
+      "TaskOutput", "TaskStop",
+      "ScheduleWakeup", "CronCreate", "CronDelete", "CronList",
+      "Monitor", "PushNotification", "RemoteTrigger",
+    "--permission-mode", "bypassPermissions",
     "--output-format", "stream-json",
     "--verbose",
     "--max-turns", "50",
