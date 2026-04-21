@@ -103,8 +103,9 @@ export function parseStreamLine(
           }
 
         } else if (blockType === "thinking") {
-          // skip — extended thinking block，不洩漏
-          break;
+          // skip — extended thinking block，不洩漏。用 continue 而非 break，
+          // 否則同一 assistant message 內 thinking 後面的 text/tool_use block 會被吞掉。
+          continue;
 
         } else if (blockType === "tool_use") {
           // tool-start event
@@ -232,7 +233,7 @@ export function parseStreamLine(
           reason: "error",
         });
       } else {
-        // 未知 result subtype
+        // 未知 result subtype — UI 能分類才能 actionable
         insertRawLog(db, {
           project_slug: projectSlug,
           source: "cc-stdout",
@@ -241,12 +242,20 @@ export function parseStreamLine(
           raw: line,
         });
         events.push({
+          type: "error",
+          projectSlug,
+          code: "CC_UNKNOWN_RESULT_SUBTYPE",
+          message: `Unknown result.subtype: ${subtype ?? "(missing)"}`,
+        });
+        events.push({
           type: "turn-end",
           projectSlug,
           messageId: currentMessageId,
           reason: "error",
         });
       }
+      // 清 buffer 防跨 turn 汙染
+      _assistantBuffers.delete(projectSlug);
       break;
     }
 

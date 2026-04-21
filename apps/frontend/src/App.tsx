@@ -57,10 +57,34 @@ function WsProvider({
   // Listen for WS errors → toast
   useEffect(() => {
     const unsub = ws.on("error", (event) => {
-      if (event.code === "TURN_ALREADY_ACTIVE") {
-        toast.error("已有進行中的對話，請等待完成");
-      } else {
-        toast.error(`錯誤：${event.message}`);
+      switch (event.code) {
+        case "TURN_ALREADY_ACTIVE":
+          toast.error("已有進行中的對話，請等待完成");
+          break;
+        case "CC_NOT_INSTALLED":
+          toast.error("claude CLI 未安裝", {
+            description: "請先安裝 Claude Code：https://claude.ai/download",
+            duration: 10_000,
+          });
+          break;
+        case "CC_NOT_AUTHENTICATED":
+          toast.error("claude CLI 未登入", {
+            description: "請在終端機執行 `claude` 完成登入，然後刷新此頁",
+            duration: 10_000,
+          });
+          break;
+        case "CC_SESSION_RESET":
+          toast.warning("Session 已重設", {
+            description: event.message,
+          });
+          break;
+        case "CC_MAX_TURNS":
+        case "CC_EXECUTION_ERROR":
+        case "CC_UNKNOWN_RESULT_SUBTYPE":
+          toast.error(`CC 執行錯誤（${event.code}）`, { description: event.message });
+          break;
+        default:
+          toast.error(`錯誤：${event.message}`);
       }
     });
     return unsub;

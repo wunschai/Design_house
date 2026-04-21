@@ -1,8 +1,9 @@
 // Backend entrypoint — reads PORT env, binds 127.0.0.1, fail-fast on EADDRINUSE
 import { buildApp } from "./app.js";
 import { createDb, listProjects, insertProject, insertSession } from "./db/client.js";
-import { checkCcHealth } from "./cc/health.js";
+import { checkCcHealth, setHealthStatus } from "./cc/health.js";
 import { watchProject, stopAllWatchers } from "./fs/watcher.js";
+import { killAllActiveProcesses } from "./cc/session.js";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -30,8 +31,9 @@ async function main(): Promise<void> {
     console.log(`[server] Created default project: ${slug}`);
   }
 
-  // CC health check（不 fail-fast，UI 顯示安裝指引）
+  // CC health check（不 fail-fast，UI 訂閱時會收到 error event，AC-7.1/7.2）
   const health = checkCcHealth();
+  setHealthStatus(health);
   if (!health.ok) {
     console.warn(`[server] CC health check: ${health.code} — ${health.message}`);
   }
@@ -72,6 +74,7 @@ async function main(): Promise<void> {
   // Graceful shutdown（NFR-13）
   async function shutdown() {
     console.log("\n[server] Shutting down...");
+    killAllActiveProcesses();   // 先 kill CC subprocess 避免 orphan
     await stopAllWatchers();
     await app.close();
     db.close();

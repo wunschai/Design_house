@@ -10,10 +10,21 @@ type FsEventCallback = (event: FsChangeEvent) => void;
 // 活躍 watcher map
 const _watchers = new Map<string, FSWatcher>();
 
-// rename dedupe state：Map<path, { timer: NodeJS.Timeout; oldPath: string }>
-const _pendingUnlinks = new Map<string, NodeJS.Timeout>();
+// rename dedupe state：Map<projectSlug, pending unlink queue>
+// 每筆紀錄 unlink 的路徑與 timer；100ms 內若出現 add 事件則配對成 rename。
+type PendingUnlink = { path: string; timer: NodeJS.Timeout };
+const _pendingUnlinks = new Map<string, PendingUnlink[]>();
 
 const RENAME_DEDUPE_MS = 100;
+
+function getPending(slug: string): PendingUnlink[] {
+  let q = _pendingUnlinks.get(slug);
+  if (!q) {
+    q = [];
+    _pendingUnlinks.set(slug, q);
+  }
+  return q;
+}
 
 function toRelativePosix(filePath: string, projectDir: string): string {
   const raw = filePath.startsWith(projectDir)
@@ -49,16 +60,26 @@ export async function watchProject(
 
   watcher.on("add", (fullPath) => {
     const relPath = toRelativePosix(fullPath, projectDir);
+    const pending = getPending(projectSlug);
 
-    // 檢查是否有 pending unlink（rename dedupe）
-    const unlink_timer = _pendingUnlinks.get(relPath);
-    if (unlink_timer) {
-      clearTimeout(unlink_timer);
-      _pendingUnlinks.delete(relPath);
-      // 這是 rename：unlink 舊路徑已記錄在 timer 的 closure
-      // 但我們無法從 timer 取回 old path...先只發 write 事件
-      // rename 的 oldPath 在 chokidar add/unlink 事件中無法直接對應
-      // 以 100ms 內 unlink+add 同一個 path 當作 rename
+    if (pending.length > 0) {
+      // 100ms 內曾有 unlink — 視為 rename。取最舊的 pending unlink 作為 oldPath。
+      const oldest = pending.shift()!;
+      clearTimeout(oldest.timer);
+      if (oldest.path === relPath) {
+        // 同路徑 unlink+add 快速連發 — 視為 atomic overwrite，發 write
+        onEvent({ type: "fs-change", projectSlug, op: "write", path: relPath });
+      } else {
+        // 不同路徑 — 真正的 rename，oldPath 才是剛消失的檔
+        onEvent({
+          type: "fs-change",
+          projectSlug,
+          op: "rename",
+          path: relPath,
+          oldPath: oldest.path,
+        });
+      }
+      return;
     }
 
     onEvent({ type: "fs-change", projectSlug, op: "write", path: relPath });
@@ -71,13 +92,23 @@ export async function watchProject(
 
   watcher.on("unlink", (fullPath) => {
     const relPath = toRelativePosix(fullPath, projectDir);
+    const pending = getPending(projectSlug);
 
-    // 設定 100ms 計時器，等等看有沒有 add 同 path（rename 情境）
-    const timer = setTimeout(() => {
-      _pendingUnlinks.delete(relPath);
-      onEvent({ type: "fs-change", projectSlug, op: "delete", path: relPath });
-    }, RENAME_DEDUPE_MS);
-    _pendingUnlinks.set(relPath, timer);
+    // 設 100ms timer；若期間有 add 會被 add handler shift 消費變 rename 或 write；
+    // timer fire 仍存在 pending 時視為真正 delete。
+    const pendingEntry: PendingUnlink = {
+      path: relPath,
+      timer: setTimeout(() => {
+        const q = _pendingUnlinks.get(projectSlug);
+        if (!q) return;
+        const idx = q.indexOf(pendingEntry);
+        if (idx !== -1) {
+          q.splice(idx, 1);
+          onEvent({ type: "fs-change", projectSlug, op: "delete", path: relPath });
+        }
+      }, RENAME_DEDUPE_MS),
+    };
+    pending.push(pendingEntry);
   });
 
   watcher.on("error", (err) => {
@@ -100,10 +131,11 @@ export async function stopWatcher(projectSlug: string): Promise<void> {
     await watcher.close();
     _watchers.delete(projectSlug);
   }
-  // 清除 pending unlink timers
-  for (const [path, timer] of _pendingUnlinks) {
-    clearTimeout(timer);
-    _pendingUnlinks.delete(path);
+  // 清除 pending unlink timers for this project
+  const q = _pendingUnlinks.get(projectSlug);
+  if (q) {
+    for (const p of q) clearTimeout(p.timer);
+    _pendingUnlinks.delete(projectSlug);
   }
 }
 

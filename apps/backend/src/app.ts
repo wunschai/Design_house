@@ -39,8 +39,7 @@ export async function buildApp(opts: AppOptions = {}): Promise<FastifyInstance> 
 
   const app = Fastify({
     logger: false,
-    // /internal 路由允許最大 10MB body
-    bodyLimit: 10 * 1024 * 1024,
+    // 全域預設用 Fastify 內建 1MB；/internal/mcp-event 路由另外設 10MB（見 routes/internal.ts）
   });
 
   // 只允許 localhost 來源的 CORS

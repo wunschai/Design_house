@@ -2,12 +2,38 @@
 // 接收 mcp-server 的 HTTP callback、執行對應工具邏輯、回傳結果
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import Database from "better-sqlite3";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, realpathSync } from "node:fs";
+import { join, dirname, sep as PATH_SEP } from "node:path";
+import { timingSafeEqual } from "node:crypto";
 import { INTERNAL_TOKEN } from "../app.js";
 import { joinProject, PathTraversalError } from "@design-house/shared/paths";
 import { getCachedResponse, registerPending } from "../internal/correlation-cache.js";
 import { broadcast } from "./ws.js";
+
+/** 往上找第一個存在的祖先資料夾（若 filePath 本身存在則回它自己）。 */
+function resolveExistingAncestor(filePath: string): string | null {
+  let p = filePath;
+  while (p) {
+    if (existsSync(p)) return p;
+    const parent = dirname(p);
+    if (parent === p) return null; // root
+    p = parent;
+  }
+  return null;
+}
+
+/** 檢查給定絕對路徑的 realpath 是否仍落在 projectRoot 內（AC-8.3 symlink guard）。 */
+function isWithinProjectRoot(filePath: string, projectRoot: string): boolean {
+  const ancestor = resolveExistingAncestor(filePath);
+  if (!ancestor) return false;
+  try {
+    const resolved = realpathSync(ancestor);
+    const rootResolved = realpathSync(projectRoot);
+    return resolved === rootResolved || resolved.startsWith(rootResolved + PATH_SEP);
+  } catch {
+    return false;
+  }
+}
 
 const MAX_WRITE_BYTES = 5 * 1024 * 1024; // 5MB (NFR-8)
 
@@ -90,10 +116,28 @@ async function handleWriteFile(
     throw e;
   }
 
+  // realpath guard（AC-8.3）— 先檢查路徑上最深的現存祖先是否仍在 projectRoot 內，
+  // 避免中間目錄是 symlink 指向外部時 mkdirSync 沿著 symlink 寫出 root 外。
+  if (!isWithinProjectRoot(filePath, projectRoot)) {
+    return {
+      ok: false,
+      error: { code: "PATH_TRAVERSAL", message: "write target escapes project root (symlink guard)" },
+    };
+  }
+
   try {
     // 自動建立中間目錄
     mkdirSync(dirname(filePath), { recursive: true });
     writeFileSync(filePath, args.content, "utf-8");
+
+    // 寫入後再檢一次 realpath（防 race / 剛被 replace 成 symlink 的情況）
+    if (!isWithinProjectRoot(filePath, projectRoot)) {
+      return {
+        ok: false,
+        error: { code: "PATH_TRAVERSAL", message: "post-write symlink escape detected" },
+      };
+    }
+
     return { ok: true, result: { ok: true, bytesWritten: byteSize } };
   } catch (e) {
     return { ok: false, error: { code: "WRITE_ERROR", message: (e as Error).message } };
@@ -241,14 +285,21 @@ export async function internalRoutes(app: FastifyInstance, opts: InternalRouteOp
       return reply.status(403).send({ error: "Forbidden: must be localhost" });
     }
 
-    // Token 驗證（NFR-2）
+    // Token 驗證（NFR-2）— 用 timingSafeEqual 避免 timing attack（紀律）
     const token = req.headers["x-internal-token"];
-    if (!token || token !== INTERNAL_TOKEN) {
+    if (typeof token !== "string" || token.length !== INTERNAL_TOKEN.length) {
+      return reply.status(403).send({ error: "Forbidden: invalid token" });
+    }
+    const a = Buffer.from(token, "utf-8");
+    const b = Buffer.from(INTERNAL_TOKEN, "utf-8");
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
       return reply.status(403).send({ error: "Forbidden: invalid token" });
     }
   });
 
-  app.post<{ Body: McpEventBody }>("/internal/mcp-event", async (req, reply) => {
+  app.post<{ Body: McpEventBody }>("/internal/mcp-event", {
+    bodyLimit: 10 * 1024 * 1024, // NFR-6: 10MB 上限僅限此路由
+  }, async (req, reply) => {
     const { projectSlug, correlationId, tool, args } = req.body;
     const projectRoot = join(projectsRoot, projectSlug);
 

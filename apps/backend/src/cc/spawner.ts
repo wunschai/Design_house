@@ -63,9 +63,10 @@ export async function spawnCc(opts: SpawnCcOptions): Promise<void> {
   };
 
   return new Promise<void>((resolve, reject) => {
-    // Windows 上 .cmd / .bat 需要 shell: true
-    const useShell = process.platform === "win32" &&
-      (CC_CLI.endsWith(".cmd") || CC_CLI.endsWith(".bat"));
+    // Windows 上 spawn 無副檔名的命令（如 "claude"）需要 shell: true 讓 cmd.exe 走 PATHEXT 解析；
+    // 否則 Node spawn 直接找 claude.exe 會 ENOENT（實際 claude 是 .cmd shim）。
+    // Unix 上保持 shell: false 以避免 shell injection 風險。
+    const useShell = process.platform === "win32";
 
     const child = spawn(CC_CLI, args, {
       env,

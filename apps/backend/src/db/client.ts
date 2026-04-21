@@ -95,7 +95,7 @@ export function getSession(
 export function updateSessionId(
   db: Database.Database,
   project_slug: string,
-  cc_session_id: string
+  cc_session_id: string | null
 ): void {
   const now = new Date().toISOString();
   db.prepare(

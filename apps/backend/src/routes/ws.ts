@@ -10,8 +10,10 @@ import type {
   ErrorEvent,
   PongEvent,
 } from "@design-house/shared/events";
-import { getProject, insertMessage, getSession } from "../db/client.js";
+import { getProject, insertMessage, getSession, insertRawLog } from "../db/client.js";
 import { ulid } from "ulid";
+import { isShortConceptualPrompt } from "@design-house/shared/weighted-length";
+import { getHealthStatus } from "../cc/health.js";
 
 // ── Broadcast pool ─────────────────────────────────────────────────
 
@@ -26,11 +28,21 @@ export function broadcast(projectSlug: string, event: ServerToClientEventType): 
   const clients = _pool.get(projectSlug);
   if (!clients) return;
   const json = JSON.stringify(event);
+  const deadSockets: WebSocket[] = [];
   for (const ws of clients) {
-    if (ws.readyState === 1 /* OPEN */) {
+    if (ws.readyState !== 1 /* OPEN */) {
+      deadSockets.push(ws);
+      continue;
+    }
+    try {
       ws.send(json);
+    } catch {
+      // send 失敗（backpressure / 剛 close）→ 視為 dead，稍後清
+      deadSockets.push(ws);
     }
   }
+  for (const d of deadSockets) clients.delete(d);
+  if (clients.size === 0) _pool.delete(projectSlug);
 }
 
 // ── Single-flight turn guard ───────────────────────────────────────
@@ -169,6 +181,12 @@ export async function wsRoutes(app: FastifyInstance, opts: WsRouteOptions): Prom
             ...(session?.cc_session_id ? { sessionId: session.cc_session_id } : {}),
           };
           sendEvent(socket, ready);
+
+          // AC-7.1 / 7.2：若 CC health 不 ok，訂閱後立刻通知 UI
+          const health = getHealthStatus();
+          if (health && !health.ok) {
+            sendError(socket, health.code, health.message, subscribedProject);
+          }
           break;
         }
 
@@ -185,6 +203,19 @@ export async function wsRoutes(app: FastifyInstance, opts: WsRouteOptions): Prom
           if (isTurnActive(projectSlug)) {
             sendError(socket, ErrorCode.TURN_ALREADY_ACTIVE, "A turn is already in progress for this project", projectSlug);
             return;
+          }
+
+          // AC-3.0 Understand heuristic — 若 project 首則訊息短而概念性，記 log（persona 層會依此發問；
+          // backend 不 gate，但給 Playwright / 人工稽核可追蹤）。
+          const isFirstTurn = !getSession(db, projectSlug)?.cc_session_id;
+          if (isFirstTurn && isShortConceptualPrompt(content, 60)) {
+            insertRawLog(db, {
+              project_slug: projectSlug,
+              source: "internal",
+              severity: "warn",
+              reason: "understand-heuristic-triggered",
+              raw: `first-turn short prompt (weighted<60): ${content.slice(0, 200)}`,
+            });
           }
 
           // 持久化 user message
