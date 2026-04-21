@@ -34,18 +34,18 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 
 ### Tasks
 
-- [ ] **Task 1.1**（S）：`git init` + root `package.json` + `pnpm-workspace.yaml` + `tsconfig.base.json`（strict、ES2022、moduleResolution bundler）
-- [ ] **Task 1.2**（S）：`.gitignore` — `node_modules/`、`dist/`、`projects/`、`.data/`、`.tmp-*`、`.env.local`、`*.log`
-- [ ] **Task 1.3**（S）：四個 sub-package stub — apps/backend、apps/mcp-server、apps/frontend、packages/shared 各自的 `package.json` + `tsconfig.json`（extends base）
-- [ ] **Task 1.4**（S）：`packages/shared/src/events.ts` 型別測試 (Red) — 為 WS 的 5 個 client→server + 11 個 server→client event 各自寫一個「payload 符合 schema」的 type assertion 測試
-- [ ] **Task 1.5**（M）：`events.ts` 實作 (Green) — Zod schema + discriminated union + 對應 TS types；對照 spec §2.1 + §2.2
-- [ ] **Task 1.6**（S）：`packages/shared/src/mcp-tools.ts` 測試 (Red) — 5 工具的 input/output Zod schema
-- [ ] **Task 1.7**（M）：`mcp-tools.ts` 實作 (Green) — 對照 spec §3.1-3.5；error code enum
-- [ ] **Task 1.8**（S）：`packages/shared/src/db-types.ts` 測試 (Red) — Project / Session / Message row types
-- [ ] **Task 1.9**（S）：`db-types.ts` 實作 (Green) — 對照 spec §5 SQLite schema
-- [ ] **Task 1.10**（S）：`packages/shared/src/paths.ts` 測試 (Red) — POSIX normalize、path traversal guard（拒 `..`、絕對路徑、symlink resolve-check）
-- [ ] **Task 1.11**（M）：`paths.ts` 實作 (Green) — 對照 ADR-008（對外字串一律 POSIX `/`）+ ADR-005 硬規 8
-- [ ] **Task 1.12**（S）：git commit M0 — message `"M0: scaffold + shared contracts"`
+- [x] **Task 1.1**（S）：`git init` + root `package.json` + `pnpm-workspace.yaml` + `tsconfig.base.json`（strict、ES2022、moduleResolution bundler）
+- [x] **Task 1.2**（S）：`.gitignore` — `node_modules/`、`dist/`、`projects/`、`.data/`、`.tmp-*`、`.env.local`、`*.log`
+- [x] **Task 1.3**（S）：四個 sub-package stub — apps/backend、apps/mcp-server、apps/frontend、packages/shared 各自的 `package.json` + `tsconfig.json`（extends base）
+- [x] **Task 1.4**（S）：`packages/shared/src/events.ts` 型別測試 (Red) — 為 WS 的 5 個 client→server + 11 個 server→client event 各自寫一個「payload 符合 schema」的 type assertion 測試
+- [x] **Task 1.5**（M）：`events.ts` 實作 (Green) — Zod schema + discriminated union + 對應 TS types；對照 spec §2.1 + §2.2
+- [x] **Task 1.6**（S）：`packages/shared/src/mcp-tools.ts` 測試 (Red) — 5 工具的 input/output Zod schema
+- [x] **Task 1.7**（M）：`mcp-tools.ts` 實作 (Green) — 對照 spec §3.1-3.5；error code enum
+- [x] **Task 1.8**（S）：`packages/shared/src/db-types.ts` 測試 (Red) — Project / Session / Message row types
+- [x] **Task 1.9**（S）：`db-types.ts` 實作 (Green) — 對照 spec §5 SQLite schema
+- [x] **Task 1.10**（S）：`packages/shared/src/paths.ts` 測試 (Red) — POSIX normalize、path traversal guard（拒 `..`、絕對路徑、symlink resolve-check）
+- [x] **Task 1.11**（M）：`paths.ts` 實作 (Green) — 對照 ADR-008（對外字串一律 POSIX `/`）+ ADR-005 硬規 8
+- [x] **Task 1.12**（S）：git commit M0 — message `"M0: scaffold + shared contracts"`
 
 ---
 

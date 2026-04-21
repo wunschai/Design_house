@@ -17,7 +17,9 @@
       "Bash(npm --version)",
       "Bash(npm install *)",
       "Bash(pnpm install *)",
-      "Bash(pnpm -r typecheck)"
+      "Bash(pnpm -r typecheck)",
+      "Bash(pnpm --filter @design-house/shared test)",
+      "Bash(pnpm --filter @design-house/shared typecheck)"
     ]
   }
 }
