@@ -5,6 +5,9 @@ import type {
   SessionRow,
   MessageRow,
   MessageRole,
+  RawLogRow,
+  RawLogSource,
+  RawLogSeverity,
 } from "./db-types.js";
 
 // ── ProjectRow ────────────────────────────────────────────────────
@@ -182,5 +185,51 @@ describe("MessageRole", () => {
   it("should include tool_result", () => {
     const role: MessageRole = "tool_result";
     expectTypeOf(role).toMatchTypeOf<MessageRole>();
+  });
+});
+
+// ── RawLogRow ─────────────────────────────────────────────────────
+
+describe("RawLogRow", () => {
+  it("should have numeric id (AUTOINCREMENT)", () => {
+    expectTypeOf<RawLogRow["id"]>().toEqualTypeOf<number>();
+  });
+
+  it("should have nullable project_slug", () => {
+    expectTypeOf<RawLogRow["project_slug"]>().toEqualTypeOf<string | null>();
+  });
+
+  it("should restrict source to enum", () => {
+    expectTypeOf<RawLogRow["source"]>().toEqualTypeOf<RawLogSource>();
+  });
+
+  it("should restrict severity to warn|error", () => {
+    expectTypeOf<RawLogRow["severity"]>().toEqualTypeOf<RawLogSeverity>();
+  });
+
+  it("should be assignable from a valid row", () => {
+    const row: RawLogRow = {
+      id: 42,
+      project_slug: "my-project",
+      source: "cc-stdout",
+      severity: "warn",
+      reason: "json-parse-failed",
+      raw: "not-json-garbage",
+      created_at: "2026-04-21T00:00:00.000Z",
+    };
+    expectTypeOf(row).toMatchTypeOf<RawLogRow>();
+  });
+});
+
+describe("RawLogSource", () => {
+  it("should accept all documented sources", () => {
+    const s1: RawLogSource = "cc-stdout";
+    const s2: RawLogSource = "cc-stderr";
+    const s3: RawLogSource = "mcp-callback";
+    const s4: RawLogSource = "internal";
+    expectTypeOf(s1).toMatchTypeOf<RawLogSource>();
+    expectTypeOf(s2).toMatchTypeOf<RawLogSource>();
+    expectTypeOf(s3).toMatchTypeOf<RawLogSource>();
+    expectTypeOf(s4).toMatchTypeOf<RawLogSource>();
   });
 });

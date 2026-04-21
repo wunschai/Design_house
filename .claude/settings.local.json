@@ -24,7 +24,23 @@
       "Bash(timeout 30 claude -p \"Reply with just the number 4, nothing else\")",
       "Bash(timeout 60 claude -p \"Say the word 'apple' and only that word\" --output-format stream-json --verbose)",
       "Bash(timeout 60 claude -p \"What word did I ask you to say a moment ago?\" --resume ce84ae05-0092-4099-bfc7-2ee7ac2cbf96 --output-format stream-json --verbose)",
-      "Bash(timeout 90 claude -p \"Read the file package.json and tell me the name field value. Do not use any other tools.\" --output-format stream-json --verbose)"
+      "Bash(timeout 90 claude -p \"Read the file package.json and tell me the name field value. Do not use any other tools.\" --output-format stream-json --verbose)",
+      "Bash(timeout 60 claude -p \"Reply with exactly: SPIKE_BASE\" --output-format stream-json --verbose)",
+      "Bash(python3 -c 'import sys, json *)",
+      "Bash(node -e 'let s=\"\"; process.stdin.on\\(\"data\",d=>s+=d\\); process.stdin.on\\(\"end\",\\(\\)=>{let e=JSON.parse\\(s\\); console.log\\(e.session_id\\)}\\)')",
+      "Bash(timeout 90 claude -p \"Now read the file package.json and tell me the pnpm.onlyBuiltDependencies values. Use Read tool.\" --resume 7d522b94-7982-4632-a0d8-b10258586ca5 --output-format stream-json --verbose)",
+      "Bash(node -e ' *)",
+      "Bash(timeout 45 claude -p \"Reply 'ok'\" --output-format stream-json --verbose)",
+      "Bash(timeout 60 claude -p \"Read the file /does/not/exist/xyz.txt and if you get an error, just say 'ERR_SEEN' and stop. Use Read tool.\" --output-format stream-json --verbose)",
+      "Bash(timeout 90 claude -p \"Read 5 different files: a.txt, b.txt, c.txt, d.txt, e.txt one at a time, each in a separate turn.\" --max-turns 2 --output-format stream-json --verbose)",
+      "Bash(mkdir -p \"D:/sideprojct/Design_house/scripts/.spike/cwd-test/.claude/agents\")",
+      "Bash(cat)",
+      "Bash(timeout 45 claude -p \"Reply 'pong'\" --output-format stream-json --verbose)",
+      "Bash(timeout 45 claude --agent design-artifact --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' -p \"List the MCP servers available to you. One sentence.\" --output-format stream-json --verbose)",
+      "Bash(rm -rf \"D:/sideprojct/Design_house/scripts/.spike\" \"D:/sideprojct/Design_house/.claude/agents/oq2-spike-mcptool.md\")",
+      "Bash(rmdir \"D:/sideprojct/Design_house/.claude/agents\")",
+      "Read(//d//**)",
+      "Bash(rm -rf \"D:/sideprojct/Design_house/scripts/.spike\" \"D:/sideprojct/Design_house/scripts\" \"D:/sideprojct/Design_house/.claude/agents\")"
     ]
   }
 }

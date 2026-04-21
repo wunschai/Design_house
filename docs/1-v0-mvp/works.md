@@ -89,3 +89,50 @@ ADR-002（--resume session 機制）、ADR-003（tool allowlist 語法）**無�
 ### 決議
 
 M2 實作可按原設計推進，無阻塞項。
+
+---
+
+## M1 v2 延伸 spike — 因 xreview 發現 v1 有缺陷而重做 — 2026-04-21
+
+### 背景
+兩個 Opus reviewer 檢視 commit 5bef808 後判定 v1 spike 有 3 類問題：
+1. **偷換命題**：OQ-1 Turn 3 未用 `--resume`，違反 exit criteria 3
+2. **未驗證假設**：OQ-2 靠讀 `ddd-developer.md` 反推、OQ-3 樣本空間 1/7
+3. **遺漏架構級風險**：plugin agent 碰撞、cwd 變化影響、`--input-format` 未測
+
+使用者決議「全修」，遂以 v2 延伸 spike 覆蓋所有 🔴 級疑慮。
+
+### v2 做法
+- OQ-1：重跑、Turn B 同時帶 `--resume` + tool_use，exit criteria 3/3 全過
+- OQ-2：建 `.claude/agents/oq2-spike-mcptool.md`（含 `tools: ["mcp__claude_ai_Google_Drive__authenticate", "Read"]`）、spawn CC、驗證 agents 清單含之
+- OQ-3：跑 tool error + `--max-turns 2` 逼出 `error_max_turns`、SIGTERM 行為定為 M2 Task 3.C.17-18 的實測範圍
+- OQ-4（新增）：驗 plugin agent 碰撞（**確認共存**）、`--agent design-artifact` 覆蓋主 session（**確認可用**）、`--bare` 不可用（**違反 ADR-001**）、`--strict-mcp-config` 隔離 MCP（**確認可用**）
+- OQ-5（新增）：驗 cwd 變化下 agent / memory / MCP 發現（**向上尋找 `.claude/agents/`**、memory 跨 subdir 共享）
+
+### 對 spec 的傳導修正
+1. **ADR-002 Decision 大改**：新增 backend spawn CC 完整命令（`--agent design-artifact --mcp-config ./.mcp.json --strict-mcp-config --output-format stream-json --verbose --max-turns 50`），`--bare` 列 Alternatives rejected
+2. **ADR-004 event table 擴充**：新增 `error_max_turns` / `error_during_execution` / SIGTERM EOF 三種 result 分支
+3. **ADR-005 啟用機制明確化**：`.claude/agents/design-artifact.md` 放專案 root、backend 以 `--agent design-artifact` flag 強制主 session 扮演
+4. **§邊界案例 9 補註**：預期 skip 的事件（rate_limit_event / thinking / caller）**不寫** raw_log
+5. **§5 SQLite schema 新增 `raw_log` table**：id / project_slug / source / severity / reason / raw / created_at
+6. **§Open Questions 標 ✅ 已解決** + 列殘留風險（SIGTERM、`error_during_execution` 合成覆蓋、`--input-format stream-json` 暫不採用）
+
+### 對 tasks.md 的傳導修正
+7. Task 3.C.1 改為「4 張 table」（加入 raw_log）
+8. Task 3.C.17-18 顯式列完整 CC spawn 命令
+9. Task 3.C.19 顯式列所有 ADR-004 event table 覆蓋（含 skip 項與 raw_log 寫入）
+10. Task 3.C.23 改用「top-level `session_id`」而非等 system.init
+11. Task 4.9 人工 + 自動雙軌，parser skip 覆蓋為 unit test 層取代
+
+### 對 packages/shared 的傳導修正
+12. `events.ts` `toolStartSchema` 加 optional `parentToolUseId`（防禦性），+4 tests
+13. `db-types.ts` 新增 `RawLogRow` / `RawLogSource` / `RawLogSeverity`，+5 tests
+14. 測試總數：156 → 165 passed / 0 failed，typecheck 4/4 packages 綠
+
+### 殘留 v0 風險（記 M2/M3）
+- SIGTERM 後 CC stream-json 收尾 → M2 Task 3.C.17-18 Red test 涵蓋
+- `error_during_execution` 實際結構 → M2 parser test 以合成事件覆蓋
+- `--input-format stream-json` 雙向流 → v0 不採用，deferred to v1+（backend 用 `--input-format text`）
+
+### 耗時
+v1: ~16 min + v2: ~25 min + 文件回修: ~20 min = ~61 min 總累計，仍在 0.5-1 d timebox 內。

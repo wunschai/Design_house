@@ -306,9 +306,20 @@ CREATE TABLE messages (
   created_at   TEXT NOT NULL
 );
 CREATE INDEX idx_messages_project_created ON messages(project_slug, created_at);
+
+CREATE TABLE raw_log (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_slug TEXT REFERENCES projects(slug) ON DELETE SET NULL,
+  source       TEXT NOT NULL CHECK (source IN ('cc-stdout','cc-stderr','mcp-callback','internal')),
+  severity     TEXT NOT NULL CHECK (severity IN ('warn','error')),
+  reason       TEXT NOT NULL,           -- 例: 'json-parse-failed' / 'unknown-event-type' / 'stream-parser-exception'
+  raw          TEXT NOT NULL,           -- 原始訊息文字（截斷至 64KB）
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX idx_raw_log_project_created ON raw_log(project_slug, created_at);
 ```
 
-SQLite 以 WAL mode 運行（`PRAGMA journal_mode=WAL`）。
+SQLite 以 WAL mode 運行（`PRAGMA journal_mode=WAL`）。`raw_log` 僅對**意外 / 語法級無效**訊息存檔（邊界案例 9）；ADR-004 明列「預期 skip」的 event 不進 raw_log。
 
 ## 邊界案例
 
@@ -320,7 +331,7 @@ SQLite 以 WAL mode 運行（`PRAGMA journal_mode=WAL`）。
 6. **瀏覽器重新整理**：重開 WS → `subscribe` → backend replay 最後 50 則 messages 給 UI（一次性 REST 補載）+ 往後以 WS 推送。
 7. **Windows 路徑長度 > 260**：`path.normalize` + 逐段檢查長度；超標回 `WRITE_ERROR`。
 8. **空 prompt**：WS payload `content.trim() === ""` → 回 `error {code:"INVALID_MESSAGE"}`。
-9. **CC 吐出無效 stream-json**：parser 遇到 `JSON.parse` 失敗時 log 該行到 SQLite `raw_log`（除錯用），繼續讀下一行。
+9. **CC 吐出無效 stream-json**：parser 遇到 `JSON.parse` 失敗時 log 該行到 SQLite `raw_log`（除錯用），繼續讀下一行。**注意**：`rate_limit_event` / `thinking` content type / `caller` / `tool_use_result` 等 ADR-004 已列的「預期 skip」欄位**不寫** `raw_log`（它們是合法事件、parser 主動忽略）。只有**語法級無效**（JSON parse error）或**未知 type**才寫 raw_log。
 10. **CC 回覆完但沒叫 `done`**：`turn-end {reason:"complete"}` 正常送出；UI 不自動導航 iframe，使用者可從 File Tree 手動點開。
 11. **mcp-server 呼叫 backend 失敗**（backend crash 或網路異常）：2 次 200ms 退避重試後失敗 → MCP 回 CC `isError: true, content:[{type:"text", text:"backend unreachable"}]`，CC 可決定是否放棄或重試。
 12. **assistant 單則 delta > 64 KB**：backend 把 delta 拆成 ≤ 16 KB 的 chunks 依序 WS 送出。
@@ -337,14 +348,36 @@ SQLite 以 WAL mode 運行（`PRAGMA journal_mode=WAL`）。
 
 **Context.** CC CLI 有兩種 session 延續方式：`--continue`（resume 當前 cwd 下最近的一個 session）與 `--resume <id>`（指定 id）。我方單一 backend cwd 可能會服務多個專案，`--continue` 的 cwd-global 語意會混淆專案界線。
 
-**Decision.** 每專案維護獨立的 `cc_session_id`，存入 SQLite `sessions` table；每 turn spawn CC 時使用 `--resume <sessionId>`。首輪（sessionId null）時 spawn 無 resume 參數，從 CC 首個 `{type:"system", subtype:"init"}` event 的 `session_id` 欄位擷取並寫回 DB。
+**Decision.** 每專案維護獨立的 `cc_session_id`，存入 SQLite `sessions` table；每 turn spawn CC 時使用 `--resume <sessionId>`。首輪（sessionId null）時 spawn 無 resume 參數，從 CC **任一 stream-json event 的 top-level `session_id` 欄位**擷取並寫回 DB（M1 spike v2 實測確認每個 event 皆帶此欄位，無需等 `system init`）。
+
+**M2 backend spawn 的完整 CC 命令**（M1 spike v2 確定，見 `research.md §OQ-4`）：
+```
+claude --print \
+       --agent design-artifact \
+       --mcp-config ./.mcp.json \
+       --strict-mcp-config \
+       --output-format stream-json \
+       --verbose \
+       --max-turns 50 \
+       [--resume <session-id>]      # 首輪省略
+       [positional prompt arg]
+```
+
+- `--agent design-artifact`：強制主 session 扮演我方 persona（見 ADR-005）。**不加**會讓 CC 預設 persona 出現
+- `--strict-mcp-config`：只載入 `./.mcp.json` 指定的 MCP servers，隔離 user-level MCP（如 `claude.ai Google Drive`）
+- `--mcp-config ./.mcp.json`：指向我方 MCP server 設定
+- `--verbose`：`stream-json` 輸出需要（否則 init event 不會出現）
+- `--max-turns 50`：防 runaway；AC-7.3 的 120s timeout 為時間維度保險
+- `--input-format text`（隱式，CLI 預設）：v0 不用 `stream-json` 輸入；未來需要 mid-turn cancel 才升級
 
 **Consequences.**
 - ✅ 多專案 session 完全隔離
-- ⚠️ 需要 spike 驗證 `--resume` 與 `--input-format stream-json` 可並用，以及 MCP tool results 確實被持久化到 session transcript — 此 spike 排在 `/ddd.tasks` 的 M1 首個 milestone
+- ✅ `session_id` 可從任一 event 擷取，parser 實作更 resilient
+- ✅ `--strict-mcp-config` 阻止 user-level MCP（如 Google Drive auth prompt）干擾 subprocess 行為
 - ⚠️ 若 CC 的 session-id 失效（CC 版本升級導致 transcript 格式變動），backend 捕捉錯誤後要能 graceful fallback 到新 session（視為 session 中斷、通知 UI）
+- ⚠️ `--bare` 模式**不可使用**：違反 ADR-001（`--bare` 強制 `ANTHROPIC_API_KEY` / apiKeyHelper，不讀訂閱 OAuth keychain）——持續依賴預設 auth 模式
 
-**Alternatives rejected.** `--continue`（cwd-global 無法區分專案）；全自手寫 context replay（複雜、易錯）。
+**Alternatives rejected.** `--continue`（cwd-global 無法區分專案）；全自手寫 context replay（複雜、易錯）；`--bare` 模式（違反 ADR-001 訂閱認證約束）。
 
 ---
 
@@ -401,13 +434,19 @@ tools:
 | `{type:"assistant", message:{content:[{type:"tool_use", id, name, input, caller?}]}}` | WS `tool-start`（`caller` 欄位 ignore） |
 | `{type:"user", message:{content:[{type:"tool_result", tool_use_id, content, is_error}]}}` | WS `tool-result`（event-level `timestamp` / `tool_use_result` 額外欄位 ignore） |
 | `{type:"rate_limit_event", rate_limit_info}` | **skip**（訂閱額度推送；v1+ 可廣播 WS `error` 顯示狀態）|
-| `{type:"result", subtype:"success"\|"error_max_turns"\|..., usage}` | WS `turn-end` |
+| `{type:"result", subtype:"success", result, ...}` | WS `turn-end reason:"complete"` |
+| `{type:"result", subtype:"error_max_turns", is_error:true, terminal_reason:"max_turns"}` | WS `turn-end reason:"error"` + `error code:"CC_MAX_TURNS"` |
+| `{type:"result", subtype:"error_during_execution", is_error:true}` | WS `turn-end reason:"error"` + `error code:"CC_EXECUTION_ERROR"`（結構推定同 max_turns，M2 parser 以合成事件覆蓋測試）|
+| SIGTERM/kill → stdout EOF 無 `result` event | Backend 判斷：spawn exit 後若無 result → WS `turn-end reason:"cancelled"\|"timeout"`（依觸發源） |
 | 未知 type | log + skip，不崩潰 |
 
-**M1 spike 驗證結果**（2026-04-21，詳見 `docs/1-v0-mvp/research.md`）：
+**M1 spike 驗證結果**（2026-04-21，v2 延伸版，詳見 `docs/1-v0-mvp/research.md`）：
 - CC 2.1.116 實測輸出結構與上表基本對齊
-- 新增發現：`rate_limit_event` / `thinking` content type / tool_use.caller — 已納入上表
+- 新增發現（v1）：`rate_limit_event` / `thinking` content type / tool_use.caller — 已納入上表
+- 新增發現（v2）：`result.subtype:"error_max_turns"` + `terminal_reason` 欄位 — 已納入上表
 - 所有事件有 top-level `session_id` 與 `uuid`，路由與 dedupe 更容易
+- `error_during_execution` 未實測（spike 無法強制觸發），M2 parser test 以合成事件覆蓋
+- SIGTERM 行為未形式化驗證（需配合真 subprocess kill），由 M2 Task 3.C.17-18 的 spawner TDD 收口
 
 所有事件以 project_slug 為 key 維護 state（messageId、current content）、寫入 SQLite。
 
@@ -427,6 +466,8 @@ tools:
 **Context.** 原始 `Claude-Design-Sys-Prompt.txt` 共 422 行，描述 ~30 個工具、12 個 skills、多種協定（`<mentioned-element>`、Tweaks、speaker notes、PPTX export、GitHub 整合等）。v0 MVP 只實作 5 個 MCP 工具（`read_file` / `write_file` / `list_files` / `show_to_user` / `done`），大量原文內容無對應工具；若直接照抄，CC 會呼叫不存在的工具、走不存在的流程、或在 HTML 產出裡寫本機環境不支援的 API。persona 必須**精簡**但保留 Design Artifact 的「靈魂」，並補上明確的 v0 fallback/constraint 硬規，避免 CC 行為漂移。
 
 **Decision.** `.claude/agents/design-artifact.md` 的 body（system prompt 部分）**只包含**以下原文區塊的精簡版，並附加 v0-specific 指示。由 `apps/backend/src/persona/build-agent.ts` 程式化組裝（source = template + 從 `Claude-Design-Sys-Prompt.txt` 選段複製），方便未來調整。
+
+**啟用機制（M1 spike v2 實測確認）**：backend spawn CC 時必加 `--agent design-artifact` flag，令 CC **主 session** 以此 agent 的 persona + tools allowlist 運行（不是透過 Task tool 派 subagent）。此 flag 會覆蓋 user-level / plugin agents 的預設主 session 設定。Agent 檔案放**專案 root** 的 `.claude/agents/design-artifact.md`（不是 `projects/<slug>/.claude/`），這樣 backend 在任何 `projects/<slug>/` 子目錄 spawn CC 皆可被發現（CC 會向上尋找 `.claude/agents/` 目錄並合併）。同時 `.mcp.json` 放專案 root 與 `--strict-mcp-config` 搭配，隔離 user-level MCP servers 如 `claude.ai Google Drive`。
 
 **Include（硬性保留——下列條目必須在 persona 檔裡讓 CC 看到具體規則）：**
 
@@ -630,15 +671,21 @@ tools:
 
 ## Open Questions（留待 /ddd.tasks 或早期 spike 解決）
 
-這些問題在本 spec 無法單靠查文件解答，需要實機驗證：
+這些問題在本 spec 無法單靠查文件解答，需要實機驗證。**✅ 全部已於 M1 spike (v2) 完成，詳見 `research.md`。**
 
-- **OQ-1**：CC CLI `--resume <id> --input-format stream-json --output-format stream-json` 同時使用時是否有已知 bug？
+- **OQ-1 ✅**：CC CLI `--resume <id>` 與 `--output-format stream-json` 同時使用可行。
 
-  **Exit criteria**：在 M1 spike 中跑 3 輪實測：(1) 首輪無 `--resume` 啟動並截下 session_id；(2) 第二輪用 `--resume <id>` 接續，驗證 CC 能回憶前輪對話內容（例如使用者說「記得我們剛才說什麼嗎」CC 回答正確）；(3) 第二輪中 MCP 工具呼叫 tool_result 出現在 stream-json 輸出。三項全過 = 通過。有任一失敗則回修 ADR-002 的 fallback plan（改每輪自行 replay context）。
+  **Exit criteria 已達成**（v2 延伸驗證）：(1) 首輪無 `--resume` 啟動並截下 session_id（每個 event top-level 都有）；(2) 第二輪用 `--resume <id>` 接續，CC 能回憶前輪 context；(3) 第二輪中 tool_use + tool_result 正確出現在 stream-json 輸出。三項全過。
 - **OQ-2**：CC subagent 的 `tools:` 欄位精確語法（大寫 `Read`、小寫 `read`、MCP 全名？）當前版本需驗證。
 - **OQ-3**：CC 實際 stream-json 事件結構 vs ADR-004 的推定，差異多大。
 
-上述三點屬於「M1 spike」範圍，`/ddd.tasks` 應將它們排為 M1 的第一個 milestone（timeboxed 0.5-1 day），結果寫入 `docs/1-v0-mvp/research.md`，如有 ADR 需更新則即時回修本檔。
+上述三點屬於「M1 spike」範圍，已於 2026-04-21 完成。v2 延伸驗證額外新增 **OQ-4**（plugin agent 碰撞 → `--agent` flag 解）與 **OQ-5**（cwd 變化影響 → agent/mcp 放專案 root），均 PASS。ADR-002 / ADR-004 / ADR-005 已回修反映結果。詳見 `research.md`。
+
+### 殘留 v0 風險（非阻塞）
+
+- **SIGTERM cancel 後 CC 收尾行為**：spike 未強制實測，由 M2 Task 3.C.17-18 spawner Red test 驗證
+- **`error_during_execution` 實際結構**：未實測，假設與 `error_max_turns` 同 shape，parser 以合成事件覆蓋
+- **`--input-format stream-json`（雙向流）**：v0 不用、backend 預設 `--input-format text`；若未來需 mid-turn cancel 再升級
 
 ## 下一步
 

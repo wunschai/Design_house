@@ -73,6 +73,10 @@ export const toolStartSchema = z.object({
   toolUseId: z.string().min(1),
   toolName: z.string().min(1),
   inputSummary: z.string(),
+  // CC stream-json exposes `parent_tool_use_id` (nested subagent ctx). v0 ADR-003
+  // blocks Task tool so this is always null in practice; kept optional as a
+  // defensive passthrough so parser can forward unchanged when non-null.
+  parentToolUseId: z.string().min(1).nullable().optional(),
 });
 
 export const toolResultSchema = z.object({

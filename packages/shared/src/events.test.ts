@@ -239,6 +239,42 @@ describe("toolStartSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("should accept optional parentToolUseId when null", () => {
+    const result = toolStartSchema.safeParse({
+      type: "tool-start",
+      projectSlug: "my-project",
+      toolUseId: "tool-use-123",
+      toolName: "read_file",
+      inputSummary: "{}",
+      parentToolUseId: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept optional parentToolUseId when set (nested ctx)", () => {
+    const result = toolStartSchema.safeParse({
+      type: "tool-start",
+      projectSlug: "my-project",
+      toolUseId: "tool-use-123",
+      toolName: "read_file",
+      inputSummary: "{}",
+      parentToolUseId: "parent-use-abc",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject empty-string parentToolUseId", () => {
+    const result = toolStartSchema.safeParse({
+      type: "tool-start",
+      projectSlug: "my-project",
+      toolUseId: "tool-use-123",
+      toolName: "read_file",
+      inputSummary: "{}",
+      parentToolUseId: "",
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("toolResultSchema", () => {

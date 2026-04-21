@@ -123,8 +123,8 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 > **驗證方式**：`pnpm --filter backend test` 全過；`pnpm --filter backend dev` 啟動後手動用 `curl` 測 REST + `wscat` 測 WS（無前端即可驗證）
 > **AC 對應**：AC-1.1/1.2/1.4、AC-2.1/2.3/2.4、AC-3.1 echo（chat-delta echo）、AC-3.3 streaming、AC-3.4 tool-start 事件、AC-5.1/5.2、AC-6.1/6.2/6.3、AC-7.1/7.2/7.3/7.4/7.5、AC-8.1/8.2
 
-- [ ] **Task 3.C.1**（S）：SQLite schema migration 測試 (Red) — 首次啟動時 3 張 table 建立、WAL 模式、索引存在
-- [ ] **Task 3.C.2**（M）：SQLite schema + `db/client.ts`（better-sqlite3）實作 (Green)
+- [ ] **Task 3.C.1**（S）：SQLite schema migration 測試 (Red) — 首次啟動時 **4 張 table** 建立（`projects` / `sessions` / `messages` / `raw_log`，見 spec §5）、WAL 模式、所有 index 存在
+- [ ] **Task 3.C.2**（M）：SQLite schema + `db/client.ts`（better-sqlite3 + WAL）實作 (Green)
 - [ ] **Task 3.C.3**（S）：Fastify bootstrap 測試 (Red) — 綁 `127.0.0.1:31823`、port 衝突時 EADDRINUSE fail-fast + 建議訊息、`PORT` env var override、啟動 ≤ 3s
 - [ ] **Task 3.C.4**（M）：Fastify bootstrap 實作 (Green) — 含 X-Internal-Token 啟動時 `crypto.randomBytes(32).toString("hex")` 生成
 - [ ] **Task 3.C.5**（S）：REST `/api/projects` CRUD 測試 (Red) — POST / GET list / GET one / DELETE；slug kebab-case + 碰撞 suffix
@@ -139,13 +139,13 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 3.C.14**（M）：WS handler 實作 (Green) — 廣播 fs-change、chat-delta 等給對應 project 的訂閱者
 - [ ] **Task 3.C.15**（S）：`/internal/mcp-event` 拒非 127.0.0.1 + token 驗證 + 413 body limit 測試 (Red)
 - [ ] **Task 3.C.16**（M）：`/internal/mcp-event` handler + correlation tracking + 5s hold-for-ack 實作 (Green)
-- [ ] **Task 3.C.17**（S）：CC spawner 測試 (Red, 用 stub fake-claude binary) — 首輪無 resume、第二輪 `--resume <id>`、120s timeout → SIGTERM、cancel 立即 SIGTERM
-- [ ] **Task 3.C.18**（M）：CC spawner 實作 (Green) — env var 注入（`DH_INTERNAL_TOKEN` / `DH_WEB_PORT` / `DH_PROJECT_ROOT` / `DH_PROJECT_SLUG`）
-- [ ] **Task 3.C.19**（S）：stream-parser 測試 (Red) — system-init / assistant-text / assistant-tool_use / user-tool_result / result / 未知 type 容錯；對照 M1 spike 蒐集的事件
+- [ ] **Task 3.C.17**（S）：CC spawner 測試 (Red) — spawn 命令組裝必含 `--agent design-artifact --mcp-config ./.mcp.json --strict-mcp-config --output-format stream-json --verbose --max-turns 50`（ADR-002）；首輪無 `--resume`、後續 `--resume <id>`；env var 注入（`DH_INTERNAL_TOKEN` / `DH_WEB_PORT` / `DH_PROJECT_ROOT` / `DH_PROJECT_SLUG`）；120s timeout → SIGTERM；cancel 立即 SIGTERM。Red 階段以 stub fake-claude binary 測命令組裝；Green 再接真 CC。
+- [ ] **Task 3.C.18**（M）：CC spawner 實作 (Green) — 用真 CC CLI 驗收一次以確認 SIGTERM 行為（對齊 OQ-3c 殘留風險）
+- [ ] **Task 3.C.19**（S）：stream-parser 測試 (Red) — 顯式覆蓋 ADR-004 event table 所有列：`system.init`（擷取 session_id）、`rate_limit_event`（**skip 不廣播**）、`assistant.thinking`（**skip 不當 chat-delta**）、`assistant.text`（→ chat-delta）、`assistant.tool_use`（→ tool-start、`caller` 欄位 ignore）、`user.tool_result`（→ tool-result、`is_error` 傳遞、event-level `timestamp`/`tool_use_result` ignore）、`result.success`（→ turn-end complete）、`result.error_max_turns`（→ turn-end error + code `CC_MAX_TURNS`）、合成 `result.error_during_execution`（→ turn-end error + code `CC_EXECUTION_ERROR`）、未知 type（log warn + skip）、JSON parse 失敗（寫 `raw_log` table）
 - [ ] **Task 3.C.20**（M）：stream-parser 實作 (Green)
 - [ ] **Task 3.C.21**（S）：chokidar fs watcher 測試 (Red) — write/delete 廣播、rename dedupe（100ms 內 unlink+add）、watcher 異常 silent retry
 - [ ] **Task 3.C.22**（M）：chokidar watcher 實作 (Green)
-- [ ] **Task 3.C.23**（S）：sessions table orchestration 測試 (Red) — 首輪 spawn 無 `--resume`、從 system-init 擷取 session_id 寫 DB、後續 `--resume <id>`；session 失效時清欄位重啟
+- [ ] **Task 3.C.23**（S）：sessions table orchestration 測試 (Red) — 首輪 spawn 無 `--resume`、**從任一 stream-json event 的 top-level `session_id` 擷取**（M1 spike 確認每個 event 都帶此欄位，不必等 system.init）、寫 DB、後續 `--resume <id>`；session 失效時清欄位重啟
 - [ ] **Task 3.C.24**（M）：session orchestration 實作 (Green)
 - [ ] **Task 3.C.25**（S）：CC health check at startup 測試 (Red) — `CC_NOT_INSTALLED`（PATH 無）、`CC_NOT_AUTHENTICATED`（捕 stderr 已知字串）；皆回 UI-ready error
 - [ ] **Task 3.C.26**（S）：CC health check 實作 (Green)
@@ -220,6 +220,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 4.8**（M）：Playwright smoke 實作 (Green) — 含 `pnpm install -D @playwright/test` + `playwright install chromium`、跑 `pnpm test:e2e` 綠燈
 - [ ] **Task 4.9**（M）：**自動化 + 人工雙軌 AC 驗收**
   - 自動部分：`pnpm test:e2e` 全綠視為自動 AC（Task 4.7 列出的 10 條）自動 tick
+  - **Parser skip 行為（unit test 層）**：驗 Task 3.C.19-20 產出的 parser unit test 涵蓋 `rate_limit_event` / `thinking` / `tool_use.caller` / `error_max_turns` / `raw_log` 寫入等列，作為 ADR-004 隱性 AC 的替代
   - 人工部分：剩餘 AC 必須人工確認 — AC-3.0（Understand 發問邏輯，Playwright 難判斷語意）、AC-3.2（persona 語氣字串檢查）、AC-3.4（tool 摘要格式）、AC-4.2/4.3/4.4/4.5（console error 收集 + timeout 的 5s 窗很脆弱，自動測易 flaky，建議人工搭配 Task 4.2 人工情境 + Task 4.3/4.4）、AC-4.6（auto-fix loop 要真 CC）、AC-4.7（summary 字數人工看）、AC-5.1/5.2（--resume 跨 turn 要實測）、AC-6.2/6.3（backend 重啟 + messages 讀回）、AC-7.1/7.2/7.3/7.4（錯誤情境手動觸發，見 Task 4.5）、AC-8.1/8.2/8.3（安全要實驗驗證）
   - 在 tasks.md 或 works.md 結尾附 AC ✓/✗ 表（全部 34 條），標記「自動」或「人工」；任一 ✗ 回溯修正
 - [ ] **Task 4.10**（S）：`docs/1-v0-mvp/works.md` 撰寫 — 實作決策、已知限制、延到 v1+ 的項目
