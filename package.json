@@ -9,6 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "prepare": "husky",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
@@ -16,9 +17,16 @@
     "dev:frontend": "pnpm --filter @design-house/frontend dev",
     "dev": "concurrently -n backend,frontend -c blue,green \"pnpm dev:backend\" \"pnpm dev:frontend\""
   },
+  "lint-staged": {
+    "apps/backend/src/persona/build-agent.ts": [
+      "pnpm --filter @design-house/backend test src/persona/"
+    ]
+  },
   "devDependencies": {
     "@types/node": "^22.9.0",
     "concurrently": "^9.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

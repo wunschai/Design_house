@@ -80,13 +80,13 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 > **驗證方式**：`pnpm --filter backend test src/persona/` 通過；執行 `tsx apps/backend/src/persona/build-agent.ts` 產出檔案後，`docs/1-v0-mvp/build-agent-diff.md` 對 Include 清單 30 條逐條打勾
 > **AC 對應**：AC-3.2（persona 語氣、不以「I'm Claude Code」開頭）
 
-- [ ] **Task 3.A.1**（S）：`build-agent.ts` 輸出結構測試 (Red) — 產出的 md 必含 YAML frontmatter 含 `name`、`description`、`tools`、body 含開頭自我定位 + workflow + 8 硬規標題等關鍵 anchors
-- [ ] **Task 3.A.2**（L）：`build-agent.ts` 實作 (Green) — 從專案根目錄的 `Claude-Design-Sys-Prompt.txt`（相對 `process.cwd()` 或 `path.resolve(__dirname, "../../../../Claude-Design-Sys-Prompt.txt")`）讀原文、按 ADR-005 Include 選段 + Add 段硬規、寫出 `.claude/agents/design-artifact.md`（專案 root，不是 `projects/<slug>/`，見 spec ADR-005 啟用機制）
-- [ ] **Task 3.A.3**（S）：產出實際 `.claude/agents/design-artifact.md` + commit 到版控
-- [ ] **Task 3.A.4**（S）：手動 diff 驗證 — 對 ADR-005 Include 30 條、Exclude 全列、Add 3 條環境 + 8 條硬規逐項 tick；不通過則回修 3.A.2
-- [ ] **Task 3.A.5**（S）：`list_files` 硬規 8 的 regression test — build-agent.ts 的 tool 描述中**不得**出現 "filter" 或 "offset" 字樣
-- [ ] **Task 3.A.5.1**（S）：裝 `husky` + `lint-staged`，pre-commit 檢查「修改的 build-agent.ts 輸出不含 'filter'/'offset' 字樣」的 regression（F1，round-4 推 M2 的 tooling 收口）
-- [ ] **Task 3.A.6**（S）：commit worktree `"M2/A: persona"`
+- [x] **Task 3.A.1**（S）：`build-agent.ts` 輸出結構測試 (Red) — 產出的 md 必含 YAML frontmatter 含 `name`、`description`、`tools`、body 含開頭自我定位 + workflow + 8 硬規標題等關鍵 anchors
+- [x] **Task 3.A.2**（L）：`build-agent.ts` 實作 (Green) — 從專案根目錄的 `Claude-Design-Sys-Prompt.txt`（相對 `process.cwd()` 或 `path.resolve(__dirname, "../../../../Claude-Design-Sys-Prompt.txt")`）讀原文、按 ADR-005 Include 選段 + Add 段硬規、寫出 `.claude/agents/design-artifact.md`（專案 root，不是 `projects/<slug>/`，見 spec ADR-005 啟用機制）
+- [x] **Task 3.A.3**（S）：產出實際 `.claude/agents/design-artifact.md` + commit 到版控
+- [x] **Task 3.A.4**（S）：手動 diff 驗證 — 對 ADR-005 Include 30 條、Exclude 全列、Add 3 條環境 + 8 條硬規逐項 tick；不通過則回修 3.A.2
+- [x] **Task 3.A.5**（S）：`list_files` 硬規 8 的 regression test — build-agent.ts 的 tool 描述中**不得**出現 "filter" 或 "offset" 字樣
+- [x] **Task 3.A.5.1**（S）：裝 `husky` + `lint-staged`，pre-commit 檢查「修改的 build-agent.ts 輸出不含 'filter'/'offset' 字樣」的 regression（F1，round-4 推 M2 的 tooling 收口）
+- [x] **Task 3.A.6**（S）：commit worktree `"M2/A: persona"`
 
 ---
 

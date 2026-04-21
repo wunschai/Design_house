@@ -46,7 +46,11 @@
       "Bash(timeout 30 claude --agent persona-stress -p \"Reply OK\")",
       "Bash(timeout 30 claude --agent persona-stress -p \"Name three common red fruits\")",
       "Bash(timeout 30 claude --agent persona-stress -p \"Show me a one-line JavaScript snippet that logs hello.\")",
-      "Bash(timeout 45 claude -p \"Write 'hi' to the file /this/path/does/not/exist/nope.txt using Write tool. Do not use Read.\" --output-format stream-json --verbose)"
+      "Bash(timeout 45 claude -p \"Write 'hi' to the file /this/path/does/not/exist/nope.txt using Write tool. Do not use Read.\" --output-format stream-json --verbose)",
+      "Bash(pnpm --filter @design-house/backend test src/persona/)",
+      "Bash(pnpm *)",
+      "Bash(npx husky *)",
+      "Bash(npx lint-staged *)"
     ]
   }
 }
