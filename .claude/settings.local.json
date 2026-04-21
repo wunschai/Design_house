@@ -19,7 +19,12 @@
       "Bash(pnpm install *)",
       "Bash(pnpm -r typecheck)",
       "Bash(pnpm --filter @design-house/shared test)",
-      "Bash(pnpm --filter @design-house/shared typecheck)"
+      "Bash(pnpm --filter @design-house/shared typecheck)",
+      "Bash(mkdir -p scripts docs/1-v0-mvp)",
+      "Bash(timeout 30 claude -p \"Reply with just the number 4, nothing else\")",
+      "Bash(timeout 60 claude -p \"Say the word 'apple' and only that word\" --output-format stream-json --verbose)",
+      "Bash(timeout 60 claude -p \"What word did I ask you to say a moment ago?\" --resume ce84ae05-0092-4099-bfc7-2ee7ac2cbf96 --output-format stream-json --verbose)",
+      "Bash(timeout 90 claude -p \"Read the file package.json and tell me the name field value. Do not use any other tools.\" --output-format stream-json --verbose)"
     ]
   }
 }

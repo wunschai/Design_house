@@ -397,10 +397,17 @@ tools:
 |---|---|
 | `{type:"system", subtype:"init", session_id, cwd, model}` | 擷取 session_id 寫入 DB（若新 session） |
 | `{type:"assistant", message:{content:[{type:"text", text}]}}` | WS `chat-delta` |
-| `{type:"assistant", message:{content:[{type:"tool_use", id, name, input}]}}` | WS `tool-start` |
-| `{type:"user", message:{content:[{type:"tool_result", tool_use_id, content, is_error}]}}` | WS `tool-result` |
+| `{type:"assistant", message:{content:[{type:"thinking", thinking, signature}]}}` | **skip**（extended thinking block，v0 不顯示；v1+ 可當 ghost delta）|
+| `{type:"assistant", message:{content:[{type:"tool_use", id, name, input, caller?}]}}` | WS `tool-start`（`caller` 欄位 ignore） |
+| `{type:"user", message:{content:[{type:"tool_result", tool_use_id, content, is_error}]}}` | WS `tool-result`（event-level `timestamp` / `tool_use_result` 額外欄位 ignore） |
+| `{type:"rate_limit_event", rate_limit_info}` | **skip**（訂閱額度推送；v1+ 可廣播 WS `error` 顯示狀態）|
 | `{type:"result", subtype:"success"\|"error_max_turns"\|..., usage}` | WS `turn-end` |
 | 未知 type | log + skip，不崩潰 |
+
+**M1 spike 驗證結果**（2026-04-21，詳見 `docs/1-v0-mvp/research.md`）：
+- CC 2.1.116 實測輸出結構與上表基本對齊
+- 新增發現：`rate_limit_event` / `thinking` content type / tool_use.caller — 已納入上表
+- 所有事件有 top-level `session_id` 與 `uuid`，路由與 dedupe 更容易
 
 所有事件以 project_slug 為 key 維護 state（messageId、current content）、寫入 SQLite。
 

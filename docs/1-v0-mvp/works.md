@@ -50,3 +50,42 @@ Agent tool 的 `isolation: "worktree"` 在 session 啟動時即判定「not in a
 - Task 1.12（最終 commit）— 待使用者確認後由 coordinator 執行
 - `.claude/settings.local.json` 有 un-tracked 變更（來自 ddd-workflow skill 執行過程中累積的權限條目），一併進 M0 commit
 - 未啟動 ESLint / Prettier — v0 不強求，留給 v1+ 擴充
+
+---
+
+## M1: Spike — 三項技術假設驗證 — 2026-04-21
+
+### 狀態
+- ✅ 完成（4/4 tasks 勾選，等 coordinator commit）
+- 總耗時：~16 min（遠低於 0.5-1 day timebox）
+- 全部 3 項 OQ **PASS**
+
+### 驗證結果摘要
+
+| OQ | 假設 | 結果 |
+|---|---|---|
+| OQ-1 | `--resume <id>` + `--output-format stream-json` 共存 | ✅ PASS — 3 項 exit criteria 全過 |
+| OQ-2 | subagent `tools:` YAML array 語法 | ✅ PASS — 以 `ddd-developer.md` 為 ground truth 確認 |
+| OQ-3 | stream-json 事件結構對齊 ADR-004 推定 | ✅ PASS（+3 項新發現納入） |
+
+詳見 `docs/1-v0-mvp/research.md`。
+
+### 對 spec 的回修
+
+**ADR-004（stream-json parser）event 表新增 2 列**：
+- `rate_limit_event` → skip（訂閱額度推送）
+- `assistant` 的 `thinking` content type → skip（extended thinking block）
+- `tool_use` 增加 optional `caller` 欄位註記為 ignore
+
+ADR-002（--resume session 機制）、ADR-003（tool allowlist 語法）**無需修改**。
+
+### 技術發現
+
+1. **每個 event 有 top-level `session_id` + `uuid`** — 簡化 backend 的 session 路由與 dedupe
+2. **`rate_limit_event`** 會在每次 turn 出現，v0 skip、v1+ 可用於前端顯示額度狀態
+3. **Extended thinking (`type:"thinking"`)** 在某些指令下會出現，v0 skip（Opus model 用 thinking block）
+4. **事件輸入格式 `--input-format stream-json`** 本輪未驗證（目前 backend 用 `-p "text"` 也成功）；M2 若需 streaming input（如即時 cancel）再驗證
+
+### 決議
+
+M2 實作可按原設計推進，無阻塞項。

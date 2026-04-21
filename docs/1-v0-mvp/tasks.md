@@ -59,10 +59,10 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 
 ### Tasks
 
-- [ ] **Task 2.1 (OQ-1 Spike)**（M）：建立 `scripts/spike-resume.sh`（或 .ps1）跑 3 輪 CC — (1) 首輪無 `--resume` + `--input/output-format stream-json`，截下 `session_id`；(2) 第二輪 `--resume <id>`，問「記得我們剛才講什麼」驗證 context；(3) 第二輪使 CC 呼叫一次（任意工具），截下 tool_result 是否進入 stream-json 輸出。結論寫 research.md §OQ-1。對應 spec OQ-1 exit criteria 三項。
-- [ ] **Task 2.2 (OQ-2 Spike)**（S）：建立 `.claude/agents/test-spike.md` + minimal `.mcp.json` 跑一個 echo tool，試 `tools: [mcp__echo__echo]` / `tools: [Read]` / `tools: [Read, mcp__echo__*]` 三種語法，記錄哪種生效。結論寫 research.md §OQ-2。
-- [ ] **Task 2.3 (OQ-3 Spike)**（M）：跑 CC 範例對話（包含 text response、tool use、tool result、final result），擷取原始 stream-json 輸出到 `research.md` 的 event catalog 區。對照 spec ADR-004 推定的欄位結構標註 match/mismatch。
-- [ ] **Task 2.4**（S）：依 spike 結果回修 ADR-002（session 機制）/ ADR-003（tool allowlist 語法）/ ADR-004（stream-json parser 映射），若任一 ADR 須變更，commit `"M1: spike results + ADR updates"`；若全對齊原設計，commit `"M1: spike verified, no ADR change"`。
+- [x] **Task 2.1 (OQ-1 Spike)**（M）：建立 `scripts/spike-resume.sh`（或 .ps1）跑 3 輪 CC — (1) 首輪無 `--resume` + `--input/output-format stream-json`，截下 `session_id`；(2) 第二輪 `--resume <id>`，問「記得我們剛才講什麼」驗證 context；(3) 第二輪使 CC 呼叫一次（任意工具），截下 tool_result 是否進入 stream-json 輸出。結論寫 research.md §OQ-1。對應 spec OQ-1 exit criteria 三項。
+- [x] **Task 2.2 (OQ-2 Spike)**（S）：建立 `.claude/agents/test-spike.md` + minimal `.mcp.json` 跑一個 echo tool，試 `tools: [mcp__echo__echo]` / `tools: [Read]` / `tools: [Read, mcp__echo__*]` 三種語法，記錄哪種生效。結論寫 research.md §OQ-2。
+- [x] **Task 2.3 (OQ-3 Spike)**（M）：跑 CC 範例對話（包含 text response、tool use、tool result、final result），擷取原始 stream-json 輸出到 `research.md` 的 event catalog 區。對照 spec ADR-004 推定的欄位結構標註 match/mismatch。
+- [x] **Task 2.4**（S）：依 spike 結果回修 ADR-002（session 機制）/ ADR-003（tool allowlist 語法）/ ADR-004（stream-json parser 映射），若任一 ADR 須變更，commit `"M1: spike results + ADR updates"`；若全對齊原設計，commit `"M1: spike verified, no ADR change"`。
 
 ---
 
