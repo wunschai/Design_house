@@ -166,19 +166,19 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 > **驗證方式**：`pnpm --filter frontend test` 全過；`pnpm --filter frontend dev` 手動測三欄渲染 + 主要互動（需配合 backend 真跑 — 整合在 M3）
 > **AC 對應**：AC-1.3、AC-2.2 UI、AC-3.0 Understand UI（觸發時機）、AC-3.1 busy indicator、AC-3.3 streaming 顯示、AC-3.4 tool 事件顯示、AC-4.2 iframe load+3s collect、AC-4.6/4.7 summary 顯示、AC-6.1 瀏覽器重開還原
 
-- [ ] **Task 3.D.1**（M）：Vite + React 18 + TS + Tailwind + shadcn/ui 初始化（scaffold-only；commit `"M2/D: vite+shadcn scaffold"`）
-- [ ] **Task 3.D.2**（S）：API client 測試 (Red) — typed fetch wrapper for `/api/projects*` + `/api/projects/:slug/*`
-- [ ] **Task 3.D.3**（S）：API client 實作 (Green)
-- [ ] **Task 3.D.4**（S）：`use-ws` hook 測試 (Red) — subscribe on mount、reconnect with exponential backoff、30s ping、discriminated union dispatch
-- [ ] **Task 3.D.5**（M）：`use-ws` 實作 (Green)
-- [ ] **Task 3.D.6**（S）：`use-project` hook 測試 (Red) — project list、current project、switch、new、delete
-- [ ] **Task 3.D.7**（S）：`use-project` 實作 (Green)
-- [ ] **Task 3.D.8**（S）：Chat panel 測試 (Red) — input + send（AC-3.1 busy state 500ms）、chat-delta streaming 渲染、tool-start/tool-result 顯示（AC-3.4 摘要 ≤ 200 chars）、cancel button
-- [ ] **Task 3.D.9**（M）：Chat panel 實作 (Green)
-- [ ] **Task 3.D.10**（S）：FileTree panel 測試 (Red) — GET files 初始載入、fs-change 增量更新、點檔 → trigger preview navigate
-- [ ] **Task 3.D.11**（S）：FileTree panel 實作 (Green)
-- [ ] **Task 3.D.12**（S）：Preview panel 測試 (Red) — iframe navigate on show_to_user、done-request 時 iframe.load → 3s 視窗內收集 `window.onerror` + `console.error` → 送 done-ack（含 correlationId）；見 spec §4.1 條 5：done-request 與使用者手動導航衝突時仍須服從 request path
-- [ ] **Task 3.D.12.1**（S）：`use-ws` regression — Vite HMR 期間 WS 斷線 → 重連後若有 in-flight `done-request` 尚未 ack，UI 必須**重新送 ack**（backend 的 ADR-010 idempotency cache 會 dedupe）；或已 timeout 則 log + drop（F4）
+- [x] **Task 3.D.1**（M）：Vite + React 18 + TS + Tailwind + shadcn/ui 初始化（scaffold-only；commit `"M2/D: vite+shadcn scaffold"`）
+- [x] **Task 3.D.2**（S）：API client 測試 (Red) — typed fetch wrapper for `/api/projects*` + `/api/projects/:slug/*`
+- [x] **Task 3.D.3**（S）：API client 實作 (Green)
+- [x] **Task 3.D.4**（S）：`use-ws` hook 測試 (Red) — subscribe on mount、reconnect with exponential backoff、30s ping、discriminated union dispatch
+- [x] **Task 3.D.5**（M）：`use-ws` 實作 (Green)
+- [x] **Task 3.D.6**（S）：`use-project` hook 測試 (Red) — project list、current project、switch、new、delete
+- [x] **Task 3.D.7**（S）：`use-project` 實作 (Green)
+- [x] **Task 3.D.8**（S）：Chat panel 測試 (Red) — input + send（AC-3.1 busy state 500ms）、chat-delta streaming 渲染、tool-start/tool-result 顯示（AC-3.4 摘要 ≤ 200 chars）、cancel button
+- [x] **Task 3.D.9**（M）：Chat panel 實作 (Green)
+- [x] **Task 3.D.10**（S）：FileTree panel 測試 (Red) — GET files 初始載入、fs-change 增量更新、點檔 → trigger preview navigate
+- [x] **Task 3.D.11**（S）：FileTree panel 實作 (Green)
+- [x] **Task 3.D.12**（S）：Preview panel 測試 (Red) — iframe navigate on show_to_user、done-request 時 iframe.load → 3s 視窗內收集 `window.onerror` + `console.error` → 送 done-ack（含 correlationId）；見 spec §4.1 條 5：done-request 與使用者手動導航衝突時仍須服從 request path
+- [x] **Task 3.D.12.1**（S）：`use-ws` regression — Vite HMR 期間 WS 斷線 → 重連後若有 in-flight `done-request` 尚未 ack，UI 必須**重新送 ack**（backend 的 ADR-010 idempotency cache 會 dedupe）；或已 timeout 則 log + drop（F4）
 - [ ] **Task 3.D.13**（M）：Preview panel 實作 (Green) — iframe 以 `src="/api/projects/:slug/files/:path"` 載入（same-origin 於 UI）+ `sandbox="allow-scripts allow-same-origin"`（見 spec §4.1）。Hook 掛載範例：
   ```tsx
   // 每次 src 變更 → iframe 重新載入 → onLoad 觸發 → 重掛 hooks
@@ -202,10 +202,10 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
   - **artifact 後覆寫 console** 的風險：用 `addEventListener('error', …)` 主要抓 uncaught exceptions；`console.error` 封裝只在 3s 收集窗期間必要
   - load 超過 **5s 未觸發** → ack `{loaded:false, consoleErrors:[]}` 並顯示 fallback 訊息（計入 AC-4.5 timeout 分支）
   - done-request 收到時，記下 start 時戳、等 onLoad、load 後繼續收 3s 內的 error，視窗結束 flush `done-ack{correlationId, loaded:true, consoleErrors}`
-- [ ] **Task 3.D.14**（S）：App.tsx 三欄 layout 測試 (Red) — 佈局結構、project switcher 位置
-- [ ] **Task 3.D.15**（S）：App.tsx 實作 (Green) — shadcn `Resizable` 三欄 + 頂部 project switcher + error toast
-- [ ] **Task 3.D.16**（S）：Bootstrap `pnpm dev` 自動開啟瀏覽器（concurrently / open）— 對應 AC-1.3「瀏覽器打開 → ≤ 3s 顯示」
-- [ ] **Task 3.D.17**（S）：commit worktree `"M2/D: frontend shell"`
+- [x] **Task 3.D.14**（S）：App.tsx 三欄 layout 測試 (Red) — 佈局結構、project switcher 位置
+- [x] **Task 3.D.15**（S）：App.tsx 實作 (Green) — shadcn `Resizable` 三欄 + 頂部 project switcher + error toast
+- [x] **Task 3.D.16**（S）：Bootstrap `pnpm dev` 自動開啟瀏覽器（concurrently / open）— 對應 AC-1.3「瀏覽器打開 → ≤ 3s 顯示」
+- [x] **Task 3.D.17**（S）：commit worktree `"M2/D: frontend shell"`
 
 ---
 

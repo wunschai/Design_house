@@ -52,7 +52,8 @@
       "Bash(npx husky *)",
       "Bash(npx lint-staged *)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('exports:', list\\(d.get\\('exports',{}\\).keys\\(\\)\\)[:20]\\); print\\('main:', d.get\\('main'\\)\\); print\\('types:', d.get\\('types'\\)\\)\"5)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(2>&1)"
     ]
   }
 }
