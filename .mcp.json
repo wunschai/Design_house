@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "design_house": {
+      "command": "node",
+      "args": ["./apps/mcp-server/dist/index.js"],
+      "env": {
+        "DH_INTERNAL_TOKEN": "${DH_INTERNAL_TOKEN}",
+        "DH_WEB_PORT": "${DH_WEB_PORT}",
+        "DH_PROJECT_ROOT": "${DH_PROJECT_ROOT}",
+        "DH_PROJECT_SLUG": "${DH_PROJECT_SLUG}"
+      }
+    }
+  }
+}

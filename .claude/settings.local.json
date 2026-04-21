@@ -50,7 +50,8 @@
       "Bash(pnpm --filter @design-house/backend test src/persona/)",
       "Bash(pnpm *)",
       "Bash(npx husky *)",
-      "Bash(npx lint-staged *)"
+      "Bash(npx lint-staged *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('exports:', list\\(d.get\\('exports',{}\\).keys\\(\\)\\)[:20]\\); print\\('main:', d.get\\('main'\\)\\); print\\('types:', d.get\\('types'\\)\\)\"5)"
     ]
   }
 }

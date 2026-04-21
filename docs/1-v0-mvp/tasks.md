@@ -97,23 +97,23 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 > **驗證方式**：`pnpm --filter mcp-server test` 全過；用 `@modelcontextprotocol/inspector` 以 stdio 連線 spawn 出的 mcp-server，手動測 5 工具 round-trip
 > **AC 對應**：AC-3.5（write_file 落檔）、AC-4.1（show_to_user iframe）、AC-4.3/4.4/4.5（done error/timeout）、AC-8.3（path traversal + symlink 拒絕）
 
-- [ ] **Task 3.B.1**（S）：env bootstrap 測試 (Red) — 缺 `DH_INTERNAL_TOKEN` / `DH_WEB_PORT` / `DH_PROJECT_ROOT` / `DH_PROJECT_SLUG` 任一時 fail-fast
-- [ ] **Task 3.B.2**（S）：env bootstrap 實作 (Green)
-- [ ] **Task 3.B.3**（S）：HTTP callback client 測試 (Red) — 帶 X-Internal-Token、超時 5s、2× 退避重試（200ms）、最終失敗回 isError
-- [ ] **Task 3.B.4**（M）：HTTP callback client 實作 (Green)
-- [ ] **Task 3.B.5**（S）：`read_file` 測試 (Red) — happy path、`FILE_NOT_FOUND`、`PATH_TRAVERSAL`（`..`、絕對、symlink 跳脫——**handler 必須呼叫 `fs.realpathSync` 確認 resolved 路徑仍 `startsWith(projectRoot)` 後才讀**，paths.ts 只做字串級 guard、realpath 是 runtime 層責任）、`READ_ERROR`
-- [ ] **Task 3.B.6**（S）：`read_file` 實作 (Green)
-- [ ] **Task 3.B.7**（S）：`write_file` 測試 (Red) — happy、自動建中間目錄、覆寫、`CONTENT_TOO_LARGE` (>5MB)、`PATH_TRAVERSAL`（**含 realpath check**：寫入前 / 後 parent dir 必 resolve 到 projectRoot 內；寫入後的檔案亦不可為 symlink 跳脫）、`WRITE_ERROR`
-- [ ] **Task 3.B.8**（S）：`write_file` 實作 (Green)
-- [ ] **Task 3.B.9**（S）：`list_files` 測試 (Red) — depth 預設 1 / 上限 5、entries ≤ 1000 + `truncated`、name 字母序、`DIR_NOT_FOUND`、**realpath check**：目錄必須 resolve 到 projectRoot 內；列舉時若遇 symlink 指向外部則跳過不列
-- [ ] **Task 3.B.10**（S）：`list_files` 實作 (Green)
-- [ ] **Task 3.B.11**（S）：`show_to_user` 測試 (Red) — fire-and-forget（mock callback 必 fire、回應 `{ok:true}` 不等 UI）；`path` 輸入仍先過 `joinProject` + `realpathSync` check（路徑作為事件字串傳給 UI、不讀檔但仍要防 UI 載入跨 project 檔）
-- [ ] **Task 3.B.12**（S）：`show_to_user` 實作 (Green)
-- [ ] **Task 3.B.13**（M）：`done` 測試 (Red) — correlationId 由 mcp-server 用 `ulid()` **每次呼叫新生**（ADR-010）、POST callback 帶 `X-Internal-Token` header、等 backend 回應（block）、5s timeout → `{ok:false, timedOut:true, consoleErrors:[]}`、含 errors 陣列的成功路徑、`path` 經 realpath guard
-- [ ] **Task 3.B.14**（M）：`done` 實作 (Green)
-- [ ] **Task 3.B.15**（M）：stdio MCP transport + tools registry（MCP SDK `Server` + `StdioServerTransport`）
-- [ ] **Task 3.B.16**（S）：`.mcp.json` 範本 — `{mcpServers: {design_house: {command:"node", args:["./apps/mcp-server/dist/index.js"], env: {...}}}}`；env 值使用 `${DH_*}` 變數從 CC 繼承
-- [ ] **Task 3.B.17**（S）：commit worktree `"M2/B: mcp-server"`
+- [x] **Task 3.B.1**（S）：env bootstrap 測試 (Red) — 缺 `DH_INTERNAL_TOKEN` / `DH_WEB_PORT` / `DH_PROJECT_ROOT` / `DH_PROJECT_SLUG` 任一時 fail-fast
+- [x] **Task 3.B.2**（S）：env bootstrap 實作 (Green)
+- [x] **Task 3.B.3**（S）：HTTP callback client 測試 (Red) — 帶 X-Internal-Token、超時 5s、2× 退避重試（200ms）、最終失敗回 isError
+- [x] **Task 3.B.4**（M）：HTTP callback client 實作 (Green)
+- [x] **Task 3.B.5**（S）：`read_file` 測試 (Red) — happy path、`FILE_NOT_FOUND`、`PATH_TRAVERSAL`（`..`、絕對、symlink 跳脫——**handler 必須呼叫 `fs.realpathSync` 確認 resolved 路徑仍 `startsWith(projectRoot)` 後才讀**，paths.ts 只做字串級 guard、realpath 是 runtime 層責任）、`READ_ERROR`
+- [x] **Task 3.B.6**（S）：`read_file` 實作 (Green)
+- [x] **Task 3.B.7**（S）：`write_file` 測試 (Red) — happy、自動建中間目錄、覆寫、`CONTENT_TOO_LARGE` (>5MB)、`PATH_TRAVERSAL`（**含 realpath check**：寫入前 / 後 parent dir 必 resolve 到 projectRoot 內；寫入後的檔案亦不可為 symlink 跳脫）、`WRITE_ERROR`
+- [x] **Task 3.B.8**（S）：`write_file` 實作 (Green)
+- [x] **Task 3.B.9**（S）：`list_files` 測試 (Red) — depth 預設 1 / 上限 5、entries ≤ 1000 + `truncated`、name 字母序、`DIR_NOT_FOUND`、**realpath check**：目錄必須 resolve 到 projectRoot 內；列舉時若遇 symlink 指向外部則跳過不列
+- [x] **Task 3.B.10**（S）：`list_files` 實作 (Green)
+- [x] **Task 3.B.11**（S）：`show_to_user` 測試 (Red) — fire-and-forget（mock callback 必 fire、回應 `{ok:true}` 不等 UI）；`path` 輸入仍先過 `joinProject` + `realpathSync` check（路徑作為事件字串傳給 UI、不讀檔但仍要防 UI 載入跨 project 檔）
+- [x] **Task 3.B.12**（S）：`show_to_user` 實作 (Green)
+- [x] **Task 3.B.13**（M）：`done` 測試 (Red) — correlationId 由 mcp-server 用 `ulid()` **每次呼叫新生**（ADR-010）、POST callback 帶 `X-Internal-Token` header、等 backend 回應（block）、5s timeout → `{ok:false, timedOut:true, consoleErrors:[]}`、含 errors 陣列的成功路徑、`path` 經 realpath guard
+- [x] **Task 3.B.14**（M）：`done` 實作 (Green)
+- [x] **Task 3.B.15**（M）：stdio MCP transport + tools registry（MCP SDK `Server` + `StdioServerTransport`）
+- [x] **Task 3.B.16**（S）：`.mcp.json` 範本 — `{mcpServers: {design_house: {command:"node", args:["./apps/mcp-server/dist/index.js"], env: {...}}}}`；env 值使用 `${DH_*}` 變數從 CC 繼承
+- [x] **Task 3.B.17**（S）：commit worktree `"M2/B: mcp-server"`
 
 ---
 
