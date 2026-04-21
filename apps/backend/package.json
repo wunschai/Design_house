@@ -25,9 +25,11 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.9.0",
     "@types/supertest": "^6.0.2",
+    "@types/ws": "^8.18.1",
     "supertest": "^7.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "ws": "^8.20.0"
   }
 }

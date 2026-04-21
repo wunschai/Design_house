@@ -1,2 +1,88 @@
-// Backend entrypoint — populated in M2 workline [C].
-export {};
+// Backend entrypoint — reads PORT env, binds 127.0.0.1, fail-fast on EADDRINUSE
+import { buildApp } from "./app.js";
+import { createDb, listProjects, insertProject, insertSession } from "./db/client.js";
+import { checkCcHealth } from "./cc/health.js";
+import { watchProject, stopAllWatchers } from "./fs/watcher.js";
+import { existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+
+const PORT = parseInt(process.env["PORT"] ?? "31823", 10);
+const PROJECTS_ROOT = join(process.cwd(), "projects");
+const DB_PATH = join(process.cwd(), ".data", "design_house.db");
+
+async function main(): Promise<void> {
+  // 建立必要目錄
+  mkdirSync(join(process.cwd(), ".data"), { recursive: true });
+  mkdirSync(PROJECTS_ROOT, { recursive: true });
+
+  // 建立 DB
+  const db = createDb(DB_PATH);
+
+  // First-run: 若 projects table 空，建立 untitled-<timestamp> 預設專案（AC-2.1）
+  const existingProjects = listProjects(db);
+  if (existingProjects.length === 0) {
+    const ts = Date.now();
+    const slug = `untitled-${ts}`;
+    const projectDir = join(PROJECTS_ROOT, slug);
+    mkdirSync(projectDir, { recursive: true });
+    insertProject(db, { slug, name: `Untitled ${new Date(ts).toLocaleString()}` });
+    insertSession(db, { project_slug: slug, cc_session_id: null });
+    console.log(`[server] Created default project: ${slug}`);
+  }
+
+  // CC health check（不 fail-fast，UI 顯示安裝指引）
+  const health = checkCcHealth();
+  if (!health.ok) {
+    console.warn(`[server] CC health check: ${health.code} — ${health.message}`);
+  }
+
+  // 建立 Fastify app
+  const app = await buildApp({ db, projectsRoot: PROJECTS_ROOT });
+
+  // 啟動各 project 的 fs watcher
+  const projects = listProjects(db);
+  for (const project of projects) {
+    const projectDir = join(PROJECTS_ROOT, project.slug);
+    if (existsSync(projectDir)) {
+      import("./routes/ws.js").then(({ broadcast }) => {
+        watchProject(project.slug, projectDir, (ev) => {
+          broadcast(project.slug, ev);
+        }).catch((err) => {
+          console.error(`[server] Failed to watch ${project.slug}:`, err);
+        });
+      }).catch(() => { /* ignore */ });
+    }
+  }
+
+  // 啟動 HTTP server（NFR-1: 綁 127.0.0.1）
+  try {
+    await app.listen({ port: PORT, host: "127.0.0.1" });
+    console.log(`[server] Listening on http://127.0.0.1:${PORT}`);
+  } catch (err: unknown) {
+    const error = err as NodeJS.ErrnoException;
+    if (error.code === "EADDRINUSE") {
+      console.error(
+        `[server] Port ${PORT} is already in use. Try: PORT=${PORT + 1} pnpm dev`
+      );
+      process.exit(1);
+    }
+    throw err;
+  }
+
+  // Graceful shutdown（NFR-13）
+  async function shutdown() {
+    console.log("\n[server] Shutting down...");
+    await stopAllWatchers();
+    await app.close();
+    db.close();
+    process.exit(0);
+  }
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
+main().catch((err) => {
+  console.error("[server] Fatal error:", err);
+  process.exit(1);
+});
