@@ -5,15 +5,15 @@ import { checkCcHealth, setHealthStatus } from "./cc/health.js";
 import { watchProject, stopAllWatchers } from "./fs/watcher.js";
 import { killAllActiveProcesses } from "./cc/session.js";
 import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { WORKSPACE_ROOT, PROJECTS_ROOT, DB_PATH } from "./util/workspace.js";
 
 const PORT = parseInt(process.env["PORT"] ?? "31823", 10);
-const PROJECTS_ROOT = join(process.cwd(), "projects");
-const DB_PATH = join(process.cwd(), ".data", "design_house.db");
 
 async function main(): Promise<void> {
-  // 建立必要目錄
-  mkdirSync(join(process.cwd(), ".data"), { recursive: true });
+  console.log(`[server] Workspace root: ${WORKSPACE_ROOT}`);
+  // 建立必要目錄（皆相對 workspace root、不受 process.cwd() 影響）
+  mkdirSync(dirname(DB_PATH), { recursive: true });
   mkdirSync(PROJECTS_ROOT, { recursive: true });
 
   // 建立 DB

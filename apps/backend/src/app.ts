@@ -3,7 +3,6 @@ import Fastify from "fastify";
 import fastifyCors from "@fastify/cors";
 import fastifyWebsocket from "@fastify/websocket";
 import { randomBytes } from "node:crypto";
-import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import type { FastifyInstance } from "fastify";
 import Database from "better-sqlite3";
@@ -11,6 +10,7 @@ import { createDb } from "./db/client.js";
 import { apiRoutes } from "./routes/api.js";
 import { wsRoutes } from "./routes/ws.js";
 import { internalRoutes } from "./routes/internal.js";
+import { PROJECTS_ROOT, DB_PATH } from "./util/workspace.js";
 
 // ── Token ───────────────────────────────────────────────────────────
 
@@ -32,10 +32,10 @@ export interface AppOptions {
 // ── buildApp ────────────────────────────────────────────────────────
 
 export async function buildApp(opts: AppOptions = {}): Promise<FastifyInstance> {
-  const projectsRoot = opts.projectsRoot ?? join(process.cwd(), "projects");
+  const projectsRoot = opts.projectsRoot ?? PROJECTS_ROOT;
   mkdirSync(projectsRoot, { recursive: true });
 
-  const db = opts.db ?? createDb(join(process.cwd(), ".data", "design_house.db"));
+  const db = opts.db ?? createDb(DB_PATH);
 
   const app = Fastify({
     logger: false,

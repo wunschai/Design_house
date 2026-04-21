@@ -1,6 +1,9 @@
 // CC health check — 啟動時驗證 CC CLI 安裝與認證狀態
 import { execSync } from "node:child_process";
 
+// Windows 下 `claude` 是 .cmd shim，execSync 不走 shell 會找不到
+const EXEC_SHELL = process.platform === "win32";
+
 export type HealthStatus =
   | { ok: true }
   | { ok: false; code: "CC_NOT_INSTALLED" | "CC_NOT_AUTHENTICATED"; message: string };
@@ -23,9 +26,9 @@ export function getHealthStatus(): HealthStatus | null {
 export function checkCcHealth(): HealthStatus {
   const cc = process.env["CC_PATH"] ?? "claude";
 
-  // 1. 驗證 CC CLI 是否在 PATH 中
+  // 1. 驗證 CC CLI 是否在 PATH 中（Windows 需 shell 走 PATHEXT 找 .cmd）
   try {
-    execSync(`"${cc}" --version`, { stdio: "pipe", timeout: 5000 });
+    execSync(`"${cc}" --version`, { stdio: "pipe", timeout: 5000, shell: EXEC_SHELL ? "cmd.exe" : undefined });
   } catch {
     return {
       ok: false,
@@ -36,7 +39,7 @@ export function checkCcHealth(): HealthStatus {
 
   // 2. 驗證 CC 是否已登入（短 ping）
   try {
-    const result = execSync(`"${cc}" -p "ok"`, { stdio: "pipe", timeout: 15000 });
+    const result = execSync(`"${cc}" -p "ok"`, { stdio: "pipe", timeout: 15000, shell: EXEC_SHELL ? "cmd.exe" : undefined });
     const output = result.toString();
     if (output.includes("Please run claude login") || output.includes("not authenticated")) {
       return {

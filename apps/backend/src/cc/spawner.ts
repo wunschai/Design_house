@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import type { ServerToClientEventType } from "@design-house/shared/events";
 import { parseStreamLine } from "./stream-parser.js";
 import { INTERNAL_TOKEN } from "../app.js";
+import { WORKSPACE_ROOT } from "../util/workspace.js";
 
 // CC_CLI は実行時に読む（テスト中に CC_PATH env を変更できるよう）
 const TURN_TIMEOUT_MS = 120_000;
@@ -33,7 +34,7 @@ export async function spawnCc(opts: SpawnCcOptions): Promise<void> {
 
   // 實行時讀取 CC_PATH，讓測試可以動態覆蓋
   const CC_CLI = process.env["CC_PATH"] ?? "claude";
-  const projectRoot = join(process.cwd(), "projects", projectSlug);
+  const projectRoot = join(WORKSPACE_ROOT, "projects", projectSlug);
   const port = process.env["PORT"] ?? "31823";
 
   // 組裝命令（ADR-002）
@@ -70,7 +71,9 @@ export async function spawnCc(opts: SpawnCcOptions): Promise<void> {
 
     const child = spawn(CC_CLI, args, {
       env,
-      cwd: process.cwd(),
+      // CC 的 cwd 必須是 workspace root，讓 `./.mcp.json` 解析正確，
+      // 且 CC 向上尋 `.claude/agents/design-artifact.md` 能找到專案級 agent。
+      cwd: WORKSPACE_ROOT,
       stdio: ["ignore", "pipe", "pipe"],
       shell: useShell,
     });
