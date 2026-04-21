@@ -213,14 +213,14 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 
 > **驗證方式**：四個 worktree merge 回 main feat branch 後，`pnpm -r build` + `pnpm -r test` 全過
 
-- [ ] **Task 3.Z.1**（S）：合併 [A] 分支到 `feat/1-v0-mvp`
-- [ ] **Task 3.Z.2**（S）：合併 [B] 分支
-- [ ] **Task 3.Z.3**（S）：合併 [C] 分支
-- [ ] **Task 3.Z.4**（S）：合併 [D] 分支
-- [ ] **Task 3.Z.4.1**（S）：Windows-specific quirks 檢查 — `write_file` 處理 CRLF vs LF（v0 保留 CC 原樣、不主動改）、拒 reserved filenames（CON / PRN / AUX / NUL / COM1-9 / LPT1-9）加入 `isSafeRelativePath` 檢查、文件檔首 BOM 保留（F2）
-- [ ] **Task 3.Z.5**（S）：跑 `pnpm -r build` + `pnpm -r test`，修任何 cross-package 編譯或 type 錯誤
-- [ ] **Task 3.Z.5.1**（S）：M2 worker FAIL playbook — 在 `docs/1-v0-mvp/works.md` 寫下「worker 回報 FAIL 時 coordinator 的決策樹」：環境問題 → 先排除；測試失敗不可能 → 先看 spec 是否需更新（/ddd.spec fallback）；流程盲點 → 改 tasks（F8）
-- [ ] **Task 3.Z.6**（S）：commit `"M2: merge all workstreams"`
+- [x] **Task 3.Z.1**（S）：合併 [A] 分支到 `feat/1-v0-mvp` — **N/A**：序列派發（env 無 worktree），直接 in-place 作業於 feat/1-v0-mvp，已 commit `b8dc09a`
+- [x] **Task 3.Z.2**（S）：合併 [B] 分支 — **N/A**：commit 於 `12e1a33`（M2/B）
+- [x] **Task 3.Z.3**（S）：合併 [C] 分支 — **N/A**：commit 於 `M2/C`
+- [x] **Task 3.Z.4**（S）：合併 [D] 分支 — **N/A**：commit 於 `M2/D`
+- [ ] **Task 3.Z.4.1**（S）：Windows-specific quirks 檢查 — **延到 M3**（v0 實測未遇到真實阻塞、deferred 至 M3 Task 4.0 附近一起審）
+- [x] **Task 3.Z.5**（S）：`pnpm -r test` = 466 passed / 0 failed（shared 192 + mcp-server 48 + backend 145 + frontend 81）；`pnpm -r build` 4/4 綠；`pnpm -r typecheck` 4/4 綠
+- [ ] **Task 3.Z.5.1**（S）：M2 worker FAIL playbook — **延到 M3**（v0 實際 4 個 worker 全無 FAIL、無需實戰 playbook，文件化延後）
+- [x] **Task 3.Z.6**（S）：commit `"M2: merge all workstreams"` — 即本 commit
 
 ---
 
