@@ -85,6 +85,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 3.A.3**（S）：產出實際 `.claude/agents/design-artifact.md` + commit 到版控
 - [ ] **Task 3.A.4**（S）：手動 diff 驗證 — 對 ADR-005 Include 30 條、Exclude 全列、Add 3 條環境 + 8 條硬規逐項 tick；不通過則回修 3.A.2
 - [ ] **Task 3.A.5**（S）：`list_files` 硬規 8 的 regression test — build-agent.ts 的 tool 描述中**不得**出現 "filter" 或 "offset" 字樣
+- [ ] **Task 3.A.5.1**（S）：裝 `husky` + `lint-staged`，pre-commit 檢查「修改的 build-agent.ts 輸出不含 'filter'/'offset' 字樣」的 regression（F1，round-4 推 M2 的 tooling 收口）
 - [ ] **Task 3.A.6**（S）：commit worktree `"M2/A: persona"`
 
 ---
@@ -138,6 +139,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 3.C.13**（S）：WS `/ws` subscribe / user-message / cancel / ping-pong 測試 (Red)
 - [ ] **Task 3.C.14**（M）：WS handler 實作 (Green) — 廣播 fs-change、chat-delta 等給對應 project 的訂閱者
 - [ ] **Task 3.C.15**（S）：`/internal/mcp-event` 拒非 127.0.0.1 + token 驗證 + 413 body limit 測試 (Red)
+- [ ] **Task 3.C.15.1**（S）：ADR-010 idempotency cache 三子 case Red test — (a) 遲到 ack（pending 已 timeout/TTL 清後 UI 才送 `done-ack`）→ log warn + drop 不重廣播；(b) TTL 60s eviction（進入 pending 60s 未被讀即清）；(c) 容量 1000 LRU（第 1001 筆淘汰最舊）（F7）
 - [ ] **Task 3.C.16**（M）：`/internal/mcp-event` handler + correlation tracking + 5s hold-for-ack 實作 (Green)
 - [ ] **Task 3.C.17**（S）：CC spawner 測試 (Red) — spawn 命令組裝必含 `--agent design-artifact --mcp-config ./.mcp.json --strict-mcp-config --output-format stream-json --verbose --max-turns 50`（ADR-002）；首輪無 `--resume`、後續 `--resume <id>`；env var 注入（`DH_INTERNAL_TOKEN` / `DH_WEB_PORT` / `DH_PROJECT_ROOT` / `DH_PROJECT_SLUG`）；120s timeout → SIGTERM；cancel 立即 SIGTERM。Red 階段以 stub fake-claude binary 測命令組裝；Green 再接真 CC。
 - [ ] **Task 3.C.18**（M）：CC spawner 實作 (Green) — 用真 CC CLI 驗收一次以確認 SIGTERM 行為（對齊 OQ-3c 殘留風險）
@@ -175,7 +177,8 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 3.D.9**（M）：Chat panel 實作 (Green)
 - [ ] **Task 3.D.10**（S）：FileTree panel 測試 (Red) — GET files 初始載入、fs-change 增量更新、點檔 → trigger preview navigate
 - [ ] **Task 3.D.11**（S）：FileTree panel 實作 (Green)
-- [ ] **Task 3.D.12**（S）：Preview panel 測試 (Red) — iframe navigate on show_to_user、done-request 時 iframe.load → 3s 視窗內收集 `window.onerror` + `console.error` → 送 done-ack（含 correlationId）
+- [ ] **Task 3.D.12**（S）：Preview panel 測試 (Red) — iframe navigate on show_to_user、done-request 時 iframe.load → 3s 視窗內收集 `window.onerror` + `console.error` → 送 done-ack（含 correlationId）；見 spec §4.1 條 5：done-request 與使用者手動導航衝突時仍須服從 request path
+- [ ] **Task 3.D.12.1**（S）：`use-ws` regression — Vite HMR 期間 WS 斷線 → 重連後若有 in-flight `done-request` 尚未 ack，UI 必須**重新送 ack**（backend 的 ADR-010 idempotency cache 會 dedupe）；或已 timeout 則 log + drop（F4）
 - [ ] **Task 3.D.13**（M）：Preview panel 實作 (Green) — iframe 以 `src="/api/projects/:slug/files/:path"` 載入（same-origin 於 UI）+ `sandbox="allow-scripts allow-same-origin"`（見 spec §4.1）。Hook 掛載範例：
   ```tsx
   // 每次 src 變更 → iframe 重新載入 → onLoad 觸發 → 重掛 hooks
@@ -214,7 +217,9 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 3.Z.2**（S）：合併 [B] 分支
 - [ ] **Task 3.Z.3**（S）：合併 [C] 分支
 - [ ] **Task 3.Z.4**（S）：合併 [D] 分支
+- [ ] **Task 3.Z.4.1**（S）：Windows-specific quirks 檢查 — `write_file` 處理 CRLF vs LF（v0 保留 CC 原樣、不主動改）、拒 reserved filenames（CON / PRN / AUX / NUL / COM1-9 / LPT1-9）加入 `isSafeRelativePath` 檢查、文件檔首 BOM 保留（F2）
 - [ ] **Task 3.Z.5**（S）：跑 `pnpm -r build` + `pnpm -r test`，修任何 cross-package 編譯或 type 錯誤
+- [ ] **Task 3.Z.5.1**（S）：M2 worker FAIL playbook — 在 `docs/1-v0-mvp/works.md` 寫下「worker 回報 FAIL 時 coordinator 的決策樹」：環境問題 → 先排除；測試失敗不可能 → 先看 spec 是否需更新（/ddd.spec fallback）；流程盲點 → 改 tasks（F8）
 - [ ] **Task 3.Z.6**（S）：commit `"M2: merge all workstreams"`
 
 ---
@@ -232,6 +237,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 
 ### Tasks
 
+- [ ] **Task 4.0**（S）：Clock drift / tz pagination 審查 — 確認 ULID 時間序與 SQLite `created_at` ISO 8601 在使用者改系統時間時的行為；`/api/projects/:slug/messages?before=` cursor 若遇到跳躍是否 graceful（F3）
 - [ ] **Task 4.1**（M）：真 CC CLI 煙霧測 — 執行 `pnpm dev` → 瀏覽器開 127.0.0.1:31823 → 發 "Make a simple hello-world landing page with a blue button" → 預期 CC 先問 2-5 題（AC-3.0 Understand 觸發）→ 回答後 CC write_file + done → iframe 顯示 → 無 console error
 - [ ] **Task 4.2**（S）：若 4.1 觸發 console error，驗證 AC-4.6 auto-fix loop — 手動注入一個壞 artifact，觀察 CC 是否自動 fix 後再叫 done（上限 3 次）
 - [ ] **Task 4.3**（S）：Session 持久化測試 — 關瀏覽器 → 重開 → 確認對話、檔案、專案清單全存在（AC-6.1）

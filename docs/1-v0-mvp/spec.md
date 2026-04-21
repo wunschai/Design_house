@@ -3,6 +3,20 @@
 > 由 `/ddd.spec` 產出，上游 `plan.md`、`PRD.md`、`TECHSTACK.md`。下一步交棒 `/ddd.tasks`。
 > 建立日期：2026-04-20
 
+## M2 Worker 閱讀路徑建議
+
+本 spec 約 700 行，不必順讀。按派遣角色切入：
+
+| Worker | 必讀段落 |
+|---|---|
+| **[A] Persona** | ADR-005 全段（啟用機制 + Include / Exclude / Add / 8 硬規）、§相關檔案 |
+| **[B] MCP server** | §3 MCP Tool 合約、§4 `/internal/mcp-event`、**ADR-010**（correlationId）、§邊界 #11/#19、ADR-008（paths）、ADR-003（tool allowlist） |
+| **[C] Backend** | §1 REST + §2 WS、§4 `/internal` + **§4.1 iframe** 理解、§5 SQLite schema（含 `raw_log`）、ADR-002（CC spawn 命令）、ADR-004（stream-parser）、ADR-006/007/008、§邊界 #1-20 |
+| **[D] Frontend** | §2.2 WS events、§1 REST、**§4.1 iframe sandbox**、§3.4/3.5（show_to_user / done）、§邊界 #14 |
+| **M3 整合** | §驗收條件（AC-1.* ~ 8.*）、§邊界全 20 條、ADR-009（Fastify + better-sqlite3）、`works.md` 時序索引 |
+
+共用：所有 worker 都須先讀「目標」「非目標」+ `research.md` M1 spike 結論（特別是 v3 persona stickiness 結果）。
+
 ## 目標
 
 建立本機 Design_house 平台的**最小端到端骨幹**：使用者在本機瀏覽器輸入 prompt，本機 Node backend spawn `claude` CLI 並以 Design Artifact persona 運作，CC 透過 stdio MCP 呼叫我方 5 個工具，將 HTML artifact 落在 `projects/<slug>/`、回傳 UI 即時刷新的檔案樹與 iframe preview。所有對話、專案、檔案狀態持久化在本機。
@@ -292,6 +306,7 @@ UI 的 `<iframe>` Preview panel 載入 `http://127.0.0.1:<PORT>/api/projects/:sl
 2. `sandbox="allow-scripts allow-same-origin"`：允許 HTML artifact 的 JS 執行（designer output 必要）+ 保留 same-origin 讓 error 捕捉生效
 3. **不加** `allow-top-navigation`、`allow-popups`、`allow-forms` 等（v0 設計 artifact 不需要）
 4. iframe `load` 事件若 >5s 未觸發（broken HTML / 404），Preview 顯示 fallback 訊息 + `done-ack { loaded: false }`（計入 AC-4.5 timeout 分支）
+5. **`done-request` 與使用者手動導航衝突**：UI 收到 `done-request {correlationId, path}` 時若 iframe 當前 src 已是他處（使用者手動在 FileTree 點了別的檔）→ UI **必須** navigate iframe 到 request 的 path、等 load + 3s 後 ack，**不得 drop**。使用者的手動導航意圖在 `done-ack` 送出後可重新觸發（這是少見情況，v0 接受短暫視覺跳動）。
 
 ### 5. SQLite schema（Backend 擁有）
 
