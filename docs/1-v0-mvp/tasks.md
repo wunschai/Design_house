@@ -18,7 +18,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 
 **Effort 圖例**：S = < 1 h、M = 1-4 h / 半天、L = 4-8 h / 1 天、XL = 多天
 
-**AC 覆蓋規劃**（29+ 條 AC 全數對應到 task）：
+**AC 覆蓋規劃**（34 條 AC 全數對應到 task）：
 - M0：AC-1.4 (SQLite schema 預備)
 - M2：其他 28 條 AC 分散到四條工作線
 - M3：對 spec 29+ AC 逐條勾選
@@ -81,7 +81,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 > **AC 對應**：AC-3.2（persona 語氣、不以「I'm Claude Code」開頭）
 
 - [ ] **Task 3.A.1**（S）：`build-agent.ts` 輸出結構測試 (Red) — 產出的 md 必含 YAML frontmatter 含 `name`、`description`、`tools`、body 含開頭自我定位 + workflow + 8 硬規標題等關鍵 anchors
-- [ ] **Task 3.A.2**（L）：`build-agent.ts` 實作 (Green) — 從 `Claude-Design-Sys-Prompt.txt` 讀原文、按 ADR-005 Include 選段 + Add 段硬規、寫出 `.claude/agents/design-artifact.md`
+- [ ] **Task 3.A.2**（L）：`build-agent.ts` 實作 (Green) — 從專案根目錄的 `Claude-Design-Sys-Prompt.txt`（相對 `process.cwd()` 或 `path.resolve(__dirname, "../../../../Claude-Design-Sys-Prompt.txt")`）讀原文、按 ADR-005 Include 選段 + Add 段硬規、寫出 `.claude/agents/design-artifact.md`（專案 root，不是 `projects/<slug>/`，見 spec ADR-005 啟用機制）
 - [ ] **Task 3.A.3**（S）：產出實際 `.claude/agents/design-artifact.md` + commit 到版控
 - [ ] **Task 3.A.4**（S）：手動 diff 驗證 — 對 ADR-005 Include 30 條、Exclude 全列、Add 3 條環境 + 8 條硬規逐項 tick；不通過則回修 3.A.2
 - [ ] **Task 3.A.5**（S）：`list_files` 硬規 8 的 regression test — build-agent.ts 的 tool 描述中**不得**出現 "filter" 或 "offset" 字樣
@@ -100,15 +100,15 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 3.B.2**（S）：env bootstrap 實作 (Green)
 - [ ] **Task 3.B.3**（S）：HTTP callback client 測試 (Red) — 帶 X-Internal-Token、超時 5s、2× 退避重試（200ms）、最終失敗回 isError
 - [ ] **Task 3.B.4**（M）：HTTP callback client 實作 (Green)
-- [ ] **Task 3.B.5**（S）：`read_file` 測試 (Red) — happy path、`FILE_NOT_FOUND`、`PATH_TRAVERSAL`（`..`、絕對、symlink 跳脫）、`READ_ERROR`
+- [ ] **Task 3.B.5**（S）：`read_file` 測試 (Red) — happy path、`FILE_NOT_FOUND`、`PATH_TRAVERSAL`（`..`、絕對、symlink 跳脫——**handler 必須呼叫 `fs.realpathSync` 確認 resolved 路徑仍 `startsWith(projectRoot)` 後才讀**，paths.ts 只做字串級 guard、realpath 是 runtime 層責任）、`READ_ERROR`
 - [ ] **Task 3.B.6**（S）：`read_file` 實作 (Green)
-- [ ] **Task 3.B.7**（S）：`write_file` 測試 (Red) — happy、自動建中間目錄、覆寫、`CONTENT_TOO_LARGE` (>5MB)、`PATH_TRAVERSAL`、`WRITE_ERROR`
+- [ ] **Task 3.B.7**（S）：`write_file` 測試 (Red) — happy、自動建中間目錄、覆寫、`CONTENT_TOO_LARGE` (>5MB)、`PATH_TRAVERSAL`（**含 realpath check**：寫入前 / 後 parent dir 必 resolve 到 projectRoot 內；寫入後的檔案亦不可為 symlink 跳脫）、`WRITE_ERROR`
 - [ ] **Task 3.B.8**（S）：`write_file` 實作 (Green)
-- [ ] **Task 3.B.9**（S）：`list_files` 測試 (Red) — depth 預設 1 / 上限 5、entries ≤ 1000 + `truncated`、name 字母序、`DIR_NOT_FOUND`
+- [ ] **Task 3.B.9**（S）：`list_files` 測試 (Red) — depth 預設 1 / 上限 5、entries ≤ 1000 + `truncated`、name 字母序、`DIR_NOT_FOUND`、**realpath check**：目錄必須 resolve 到 projectRoot 內；列舉時若遇 symlink 指向外部則跳過不列
 - [ ] **Task 3.B.10**（S）：`list_files` 實作 (Green)
-- [ ] **Task 3.B.11**（S）：`show_to_user` 測試 (Red) — fire-and-forget（mock callback 必 fire、回應 `{ok:true}` 不等 UI）
+- [ ] **Task 3.B.11**（S）：`show_to_user` 測試 (Red) — fire-and-forget（mock callback 必 fire、回應 `{ok:true}` 不等 UI）；`path` 輸入仍先過 `joinProject` + `realpathSync` check（路徑作為事件字串傳給 UI、不讀檔但仍要防 UI 載入跨 project 檔）
 - [ ] **Task 3.B.12**（S）：`show_to_user` 實作 (Green)
-- [ ] **Task 3.B.13**（M）：`done` 測試 (Red) — correlation id 生成、POST callback、等 backend 回應（block）、5s timeout → `{ok:false, timedOut:true, consoleErrors:[]}`、含 errors 陣列的成功路徑
+- [ ] **Task 3.B.13**（M）：`done` 測試 (Red) — correlationId 由 mcp-server 用 `ulid()` **每次呼叫新生**（ADR-010）、POST callback 帶 `X-Internal-Token` header、等 backend 回應（block）、5s timeout → `{ok:false, timedOut:true, consoleErrors:[]}`、含 errors 陣列的成功路徑、`path` 經 realpath guard
 - [ ] **Task 3.B.14**（M）：`done` 實作 (Green)
 - [ ] **Task 3.B.15**（M）：stdio MCP transport + tools registry（MCP SDK `Server` + `StdioServerTransport`）
 - [ ] **Task 3.B.16**（S）：`.mcp.json` 範本 — `{mcpServers: {design_house: {command:"node", args:["./apps/mcp-server/dist/index.js"], env: {...}}}}`；env 值使用 `${DH_*}` 變數從 CC 繼承
@@ -176,7 +176,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 - [ ] **Task 3.D.10**（S）：FileTree panel 測試 (Red) — GET files 初始載入、fs-change 增量更新、點檔 → trigger preview navigate
 - [ ] **Task 3.D.11**（S）：FileTree panel 實作 (Green)
 - [ ] **Task 3.D.12**（S）：Preview panel 測試 (Red) — iframe navigate on show_to_user、done-request 時 iframe.load → 3s 視窗內收集 `window.onerror` + `console.error` → 送 done-ack（含 correlationId）
-- [ ] **Task 3.D.13**（M）：Preview panel 實作 (Green) — iframe sandbox 設定讓 parent 能掛 listener
+- [ ] **Task 3.D.13**（M）：Preview panel 實作 (Green) — iframe 以 `src="/api/projects/:slug/files/:path"` 載入（same-origin 於 UI）+ `sandbox="allow-scripts allow-same-origin"`（見 spec §4.1）；mount 時 attach `contentWindow.onerror` 與 `contentWindow.console.error` hooks 收 runtime errors；done-request 收到時 iframe.load + 3s 視窗內收集後送 `done-ack`；load 超過 5s 未觸發 → ack `{loaded:false}` 並顯示 fallback
 - [ ] **Task 3.D.14**（S）：App.tsx 三欄 layout 測試 (Red) — 佈局結構、project switcher 位置
 - [ ] **Task 3.D.15**（S）：App.tsx 實作 (Green) — shadcn `Resizable` 三欄 + 頂部 project switcher + error toast
 - [ ] **Task 3.D.16**（S）：Bootstrap `pnpm dev` 自動開啟瀏覽器（concurrently / open）— 對應 AC-1.3「瀏覽器打開 → ≤ 3s 顯示」
@@ -199,7 +199,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 
 ## Milestone 4 (M3): 整合 + E2E smoke + AC 驗收
 
-> **預期結果**：完整使用者流程跑得通，spec 29+ 條 AC 全數勾掉
+> **預期結果**：完整使用者流程跑得通，spec 34 條 AC 全數勾掉
 > **驗證方式**：Playwright smoke 通過 + 人工走 AC checklist
 > **AC 對應**：全部 — 這個 milestone 是收口
 > **完工 DoD**：

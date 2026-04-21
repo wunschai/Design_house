@@ -136,7 +136,7 @@ D:\sideprojct\Design_house\
 | DELETE | `/api/projects/:slug` | — | `{ok: true}` |
 | GET | `/api/projects/:slug/messages?limit=&before=` | — | `Array<Message>`（見下方 schema） |
 | GET | `/api/projects/:slug/files?path=&depth=` | — | `FileTree`（見下方 schema） |
-| GET | `/api/projects/:slug/files/*path` | — | 檔案內容（static serve，供 iframe 載入） |
+| GET | `/api/projects/:slug/files/*path` | — | 檔案內容（static serve，供 iframe 載入）。**必須 same-origin 於 UI**（都是 `http://127.0.0.1:31823/`），否則 AC-4.2 `console.error`/`window.onerror` 捕捉會因 cross-origin 被遮蔽為 `"Script error."`。`Content-Type` 依副檔名（`.html` → `text/html; charset=utf-8`） |
 
 **`Message` schema：**
 ```ts
@@ -186,7 +186,7 @@ WS 連線建立後必須先送 `subscribe`。所有事件 JSON 編碼，每則�
 | `ready` | `{projectSlug, sessionId?}` | 訂閱完成 |
 | `message-ack` | `{clientMessageId, serverMessageId}` | user-message 已持久化 |
 | `chat-delta` | `{projectSlug, messageId, delta: string}` | assistant 文字增量 |
-| `tool-start` | `{projectSlug, toolUseId, toolName, inputSummary}` | CC 呼叫 MCP 工具 |
+| `tool-start` | `{projectSlug, toolUseId, toolName, inputSummary, parentToolUseId?: string\|null}` | CC 呼叫 MCP 工具。`parentToolUseId` 在 v0（Task tool 封鎖）永遠為 `null`；仍在 schema 中作為 defensive passthrough |
 | `tool-result` | `{projectSlug, toolUseId, isError, summary}` | MCP 工具回應 |
 | `fs-change` | `{projectSlug, op: "write"\|"delete"\|"rename", path, oldPath?}` | chokidar 偵測到變更 |
 | `show-to-user` | `{projectSlug, path}` | UI 應 navigate iframe 到該檔 |
@@ -277,6 +277,17 @@ mcp-server 在啟動時由 backend 透過環境變數注入：
 - `DH_PROJECT_ROOT`（絕對路徑，`projects/<slug>/`）
 - `DH_PROJECT_SLUG`
 
+**`correlationId` 生成規則**（見 ADR-010）：mcp-server 在發送每個 HTTP POST 前用 `ulid()` 產生新 id。Backend 對同一 id 的重複請求以 cached response 回覆（idempotent）。
+
+### 4.1 Preview iframe 的 sandbox 與 origin 規則
+
+UI 的 `<iframe>` Preview panel 載入 `http://127.0.0.1:<PORT>/api/projects/:slug/files/<path>`，必須：
+
+1. 與 UI **同 origin**（都 serve 於 `http://127.0.0.1:<PORT>`），讓 parent window 可跨 frame 讀 `iframe.contentWindow.console` 與掛 `iframe.contentWindow.onerror` 收 runtime errors（AC-4.2 ~ AC-4.4）
+2. `sandbox="allow-scripts allow-same-origin"`：允許 HTML artifact 的 JS 執行（designer output 必要）+ 保留 same-origin 讓 error 捕捉生效
+3. **不加** `allow-top-navigation`、`allow-popups`、`allow-forms` 等（v0 設計 artifact 不需要）
+4. iframe `load` 事件若 >5s 未觸發（broken HTML / 404），Preview 顯示 fallback 訊息 + `done-ack { loaded: false }`（計入 AC-4.5 timeout 分支）
+
 ### 5. SQLite schema（Backend 擁有）
 
 ```sql
@@ -339,6 +350,10 @@ SQLite 以 WAL mode 運行（`PRAGMA journal_mode=WAL`）。`raw_log` 僅對**�
 14. **同輪 `done` 與 `show_to_user` 交錯呼叫**：UI 以 FIFO 處理，但 `done-request` 不會被後續的 `show-to-user` 打斷（UI 一律先完成 done 才處理下一個）。
 15. **專案 slug 字元非 ASCII**：slug 正規化把 CJK 轉成 `project-<timestamp>`；name 欄位仍保留原字串。
 16. **兩個 project 同時 turn（未來 v1+ 支援，v0 不支援）**：v0 全域 single-flight，第二個專案的 send → `TURN_ALREADY_ACTIVE`。
+17. **/internal/mcp-event body > 10 MB（NFR-6 上限）**：Fastify `bodyLimit: 10*1024*1024`，超標回 HTTP 413；mcp-server 端應先拒絕 `write_file` 的 content > 5 MB（NFR-8 + `CONTENT_TOO_LARGE` error），防走到 10 MB 上限。
+18. **WS 連線連續 2 次 ping 未回 pong（NFR-7）**：backend 主動關閉 connection（`close code 1001`）；UI 偵測斷線後指數退避重連（見 `use-ws` hook 測試）。
+19. **mcp-server HTTP retry 造成 `/internal/mcp-event` 同 correlationId 二次送達**：backend 查 in-memory pending map / recent responses，以 cached result 回覆，不重複廣播 `done-request`（ADR-010 idempotency）。
+20. **CC subprocess SIGTERM 後 2s 未 exit**：backend 升級 SIGKILL（TerminateProcess on Windows），並發出 WS `turn-end reason:"timeout"` 或 `"cancelled"`（視觸發源）。
 
 ## ADR
 
@@ -356,6 +371,7 @@ claude --print \
        --agent design-artifact \
        --mcp-config ./.mcp.json \
        --strict-mcp-config \
+       --permission-mode dontAsk \
        --output-format stream-json \
        --verbose \
        --max-turns 50 \
@@ -366,18 +382,27 @@ claude --print \
 - `--agent design-artifact`：強制主 session 扮演我方 persona（見 ADR-005）。**不加**會讓 CC 預設 persona 出現
 - `--strict-mcp-config`：只載入 `./.mcp.json` 指定的 MCP servers，隔離 user-level MCP（如 `claude.ai Google Drive`）
 - `--mcp-config ./.mcp.json`：指向我方 MCP server 設定
+- `--permission-mode dontAsk`：CC tool 呼叫（MCP 工具）不向使用者 prompt 授權（v0 本機單使用者、subprocess 模式、使用者已隱含信任；且 Backend 無互動 pipeline 回答 permission prompt）。`default` 模式會在 write/edit 類 tool 阻塞等 stdin 授權，導致 subprocess 卡住
 - `--verbose`：`stream-json` 輸出需要（否則 init event 不會出現）
 - `--max-turns 50`：防 runaway；AC-7.3 的 120s timeout 為時間維度保險
 - `--input-format text`（隱式，CLI 預設）：v0 不用 `stream-json` 輸入；未來需要 mid-turn cancel 才升級
+
+**Process 終止策略（AC-7.3 / AC-7.4 的 Spawner 實作要求）**：
+- 使用者 cancel 或 120s timeout → 先 `SIGTERM`，給 CC 2s 讓它關 stdout flush
+- 2s 內未 exit → 升級 `SIGKILL`（Windows 上為 `process.kill(pid, "SIGKILL")` → 底層 TerminateProcess）
+- spawner 需等 `close` event 才宣告 turn 結束；stdout 收到 `result` event 或 EOF 皆視為結束輸入
 
 **Consequences.**
 - ✅ 多專案 session 完全隔離
 - ✅ `session_id` 可從任一 event 擷取，parser 實作更 resilient
 - ✅ `--strict-mcp-config` 阻止 user-level MCP（如 Google Drive auth prompt）干擾 subprocess 行為
+- ✅ `--permission-mode dontAsk` 避免 subprocess 卡等授權（headless 環境必要）
+- ✅ SIGTERM→SIGKILL 2s 升級讓 cancel/timeout 確定性結束，不會殘留殭屍 process
 - ⚠️ 若 CC 的 session-id 失效（CC 版本升級導致 transcript 格式變動），backend 捕捉錯誤後要能 graceful fallback 到新 session（視為 session 中斷、通知 UI）
 - ⚠️ `--bare` 模式**不可使用**：違反 ADR-001（`--bare` 強制 `ANTHROPIC_API_KEY` / apiKeyHelper，不讀訂閱 OAuth keychain）——持續依賴預設 auth 模式
+- ⚠️ `--permission-mode dontAsk` 等於允許 CC 自由呼叫 subagent tools allowlist 內的 MCP 工具；邊界由 ADR-003 的 allowlist + paths.ts 的路徑 guard 共同守住，不靠 permission prompt
 
-**Alternatives rejected.** `--continue`（cwd-global 無法區分專案）；全自手寫 context replay（複雜、易錯）；`--bare` 模式（違反 ADR-001 訂閱認證約束）。
+**Alternatives rejected.** `--continue`（cwd-global 無法區分專案）；全自手寫 context replay（複雜、易錯）；`--bare` 模式（違反 ADR-001 訂閱認證約束）；`--permission-mode default`（subprocess 會卡等 stdin 授權導致 turn 永不結束）；僅 SIGTERM 不升級 SIGKILL（Windows 下 CC 可能不回應 SIGTERM，turn 無法終止）。
 
 ---
 
@@ -467,7 +492,9 @@ tools:
 
 **Decision.** `.claude/agents/design-artifact.md` 的 body（system prompt 部分）**只包含**以下原文區塊的精簡版，並附加 v0-specific 指示。由 `apps/backend/src/persona/build-agent.ts` 程式化組裝（source = template + 從 `Claude-Design-Sys-Prompt.txt` 選段複製），方便未來調整。
 
-**啟用機制（M1 spike v2 實測確認）**：backend spawn CC 時必加 `--agent design-artifact` flag，令 CC **主 session** 以此 agent 的 persona + tools allowlist 運行（不是透過 Task tool 派 subagent）。此 flag 會覆蓋 user-level / plugin agents 的預設主 session 設定。Agent 檔案放**專案 root** 的 `.claude/agents/design-artifact.md`（不是 `projects/<slug>/.claude/`），這樣 backend 在任何 `projects/<slug>/` 子目錄 spawn CC 皆可被發現（CC 會向上尋找 `.claude/agents/` 目錄並合併）。同時 `.mcp.json` 放專案 root 與 `--strict-mcp-config` 搭配，隔離 user-level MCP servers 如 `claude.ai Google Drive`。
+**啟用機制（M1 spike v2 + v3 stress test 實測確認）**：backend spawn CC 時必加 `--agent design-artifact` flag，令 CC **主 session** 以此 agent 的 persona + tools allowlist 運行（不是透過 Task tool 派 subagent）。此 flag 會覆蓋 user-level / plugin agents 的預設主 session 設定。Agent 檔案放**專案 root** 的 `.claude/agents/design-artifact.md`（不是 `projects/<slug>/.claude/`），這樣 backend 在任何 `projects/<slug>/` 子目錄 spawn CC 皆可被發現（CC 會向上尋找 `.claude/agents/` 目錄並合併）。同時 `.mcp.json` 放專案 root 與 `--strict-mcp-config` 搭配，隔離 user-level MCP servers 如 `claude.ai Google Drive`。
+
+**持續力實測（v3 stress test，2026-04-21）**：以 ~50 行 persona（含 positive rule「尾端必含 🦄SENTINEL🦄」、3 條 negative 硬規「禁字 apple」「禁 JS code block」「禁 Task 工具」、25 條背景規則）測試 `--agent` 是否能在多輪 prompt pressure 下鎖住行為。3 項測試全通過：(1) 每個回覆都正確結尾 SENTINEL；(2) 要求列舉紅色水果時用「the forbidden fruit」替代；(3) 要求 JS 時轉推 Python 並解釋禁用原因。→ ADR-005 的 8 條 Fallback 硬規（規模小於 stress test）應能被可靠遵守，**風險 mitigated**。
 
 **Include（硬性保留——下列條目必須在 persona 檔裡讓 CC 看到具體規則）：**
 
@@ -494,6 +521,7 @@ tools:
 - 原文 L125「Give 3+ variations across several dimensions」：每個需求都嘗試給 3 個以上變體（基礎 by-the-book 1-2 個 + 新穎創意 1-2 個，混色彩 / 視覺 / 互動 / 排版等維度）。v0 無 `design_canvas` / Tweaks，變體以**多個檔案**（`Design v1.html` / `v2.html` / `v3.html`）或**單檔內 tab / section 切換**呈現
 - 原文 L127「CSS / HTML / JS / SVG 很強大，使用者常常不知道能做什麼；surprise the user」
 - 原文 L129「If you do not have an icon / asset / component, draw a placeholder — placeholder 比爛的真品好」
+- 原文 L38「Copy needed assets from design systems or UI kits; do not reference them directly. Don't bulk-copy large resource folders (>20 files) — make targeted copies of only files you need, or write your file first and then copy just the assets it references.」 — 通用的資產/檔案操作紀律，v0 `read_file`/`write_file` 情境亦適用
 - 原文 L173「Linking between pages：用標準 `<a>` + relative URL（例 `<a href="my_folder/My Prototype.html">`）讓使用者在多檔 HTML 之間導航」
 - 原文 L297「Do not add filler content：不要用 placeholder text / dummy sections / 資訊物填版面。Every element 要 earn its place。One thousand no's for every yes。避免 data slop — 無意義的數字／icon／stat」
 - 原文 L299「Ask before adding material：覺得加 section / page / copy 會更好時，先問使用者，不要擅自加」
@@ -616,19 +644,42 @@ tools:
 
 ---
 
-### ADR-009 — Backend 技術棧鎖定：Fastify + better-sqlite3
+### ADR-009 — Backend 技術棧鎖定：Fastify v5 + better-sqlite3
 
-**Status:** Accepted · 2026-04-20
+**Status:** Accepted · 2026-04-20（v5 於 2026-04-21 M0 實作時 bump，記於 works.md D2）
 
-**Context.** plan.md brainstorming 確定 Node+TS，但未在 spec 明示具體框架。
+**Context.** plan.md brainstorming 確定 Node+TS，但未在 spec 明示具體框架版本。
 
-**Decision.** Backend HTTP/WS server 使用 **Fastify v4**（理由：效能、TS 原生支援、WebSocket 官方 plugin、內建 schema validation）。SQLite driver 使用 **better-sqlite3**（理由：同步 API 簡化 single-user 情境、效能）。
+**Decision.** Backend HTTP/WS server 使用 **Fastify v5**（原版 spec 寫 v4；M0 落地時升到 v5 因其 Node 20+ 最佳支援、TS 型別較佳、`@fastify/websocket` v11 已跟進）。SQLite driver 使用 **better-sqlite3 v11**（同步 API 簡化 single-user 情境、效能）。
 
 **Consequences.**
 - ✅ ADR-001 綁 localhost 與 Fastify 的 host 設定相容
-- ⚠️ better-sqlite3 需要 native build，Windows 環境需 node-gyp + VS build tools（在 README 註明）
+- ✅ v5 API 與 v4 在 handler / plugin 模式上兼容度高，不影響 spec 其他章節
+- ⚠️ better-sqlite3 需要 native build，Windows 環境需 node-gyp + VS build tools（在 README 註明，M0 已驗證可用）
 
-**Alternatives rejected.** Express（較慢、需額外 plugin）；Koa（生態小）；libsql（需額外服務）；node-sqlite3（async 較繁瑣）。
+**Alternatives rejected.** Express（較慢、需額外 plugin）；Koa（生態小）；libsql（需額外服務）；node-sqlite3（async 較繁瑣）；固守 Fastify v4（Node 25 上 v5 更穩）。
+
+---
+
+### ADR-010 — `correlationId` 由 mcp-server 生成（ULID），backend 做 dedupe
+
+**Status:** Accepted · 2026-04-21
+
+**Context.** `/internal/mcp-event` 的 POST payload 帶 `correlationId`（見 §4），用於 `done`（阻塞工具）的 request/response 匹配。spec 沒明確寫是 mcp-server 生、還是 backend 生、還是 CC 生。若生成方未明，平行實作會卡在介面糾紛。
+
+**Decision.**
+- **mcp-server 在發 HTTP POST 前產生新 ULID**（`ulid` npm 套件）作為 `correlationId`，寫入 payload
+- backend 的 `/internal/mcp-event` handler 維護 in-memory `Map<correlationId, Pending>`，收到 `done` tool 請求時註冊 pending、廣播 `done-request{correlationId}` 到 WS、等 UI `done-ack{correlationId}` 或 5s timeout
+- backend **對重複 `correlationId` 做 idempotency**：若同個 id 二次進來（mcp-server HTTP retry 造成），第二次以 cached response 回覆、不重複廣播
+
+**Consequences.**
+- ✅ 單一生成點、單一 dedupe 點，邏輯清楚
+- ✅ ULID 時間序＋字典序，debug 時易排序
+- ✅ backend idempotency 保護：mcp-server HTTP callback retry（2× 200ms 退避）不會觸發重複 `done-request` 廣播
+- ⚠️ mcp-server 需 `ulid` dep（apps/mcp-server/package.json 已裝）
+- ⚠️ idempotency cache 只在單 process lifetime 有效，backend 重啟則清空；v0 可接受（重啟期間無待處理 done）
+
+**Alternatives rejected.** Backend 生 id 後回傳給 mcp-server（多一 round-trip）；CC 提供 tool_use_id（每個工具不同 id、done retry 時 tool_use_id 相同也會混淆）；UUID v4（無時間序）。
 
 ---
 

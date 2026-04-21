@@ -31,6 +31,11 @@ describe("readFileInputSchema", () => {
     const result = readFileInputSchema.safeParse({});
     expect(result.success).toBe(false);
   });
+
+  it("should reject extra fields (strict schema, ADR-005 rule 8)", () => {
+    const result = readFileInputSchema.safeParse({ path: "x.html", extra: true });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("readFileOutputSchema", () => {
@@ -191,6 +196,11 @@ describe("showToUserInputSchema", () => {
     const result = showToUserInputSchema.safeParse({ path: "" });
     expect(result.success).toBe(false);
   });
+
+  it("should reject extra fields (strict schema, ADR-005 rule 8)", () => {
+    const result = showToUserInputSchema.safeParse({ path: "x.html", asset: "foo" });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("showToUserOutputSchema", () => {
@@ -215,6 +225,11 @@ describe("doneInputSchema", () => {
 
   it("should reject empty path", () => {
     const result = doneInputSchema.safeParse({ path: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject extra fields (strict schema, ADR-005 rule 8)", () => {
+    const result = doneInputSchema.safeParse({ path: "x.html", timeout: 5000 });
     expect(result.success).toBe(false);
   });
 });

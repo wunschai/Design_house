@@ -240,12 +240,40 @@ xreview：spike 全在 coordinator cwd (`D:\sideprojct\Design_house`) 跑，但 
 | OQ-5 | ✅ PASS（有注意事項）| ADR-005 補「agent/mcp 配置放專案 root」 |
 
 ### 殘留風險（v0 可接受、記 M3 AC 驗證）
-1. **SIGTERM 後 CC stream-json 的實際收尾**：本 spike 未強制測，由 Task 3.C.17-18 的 Red test 負責
-2. **`--input-format stream-json`（雙向流）**：v0 backend 預設採 `--input-format text`（positional prompt 即可），`--input-format stream-json` 若未來需要即時 cancel-mid-turn 再啟用。works.md 已記為 deferred。
-3. **`error_during_execution`**：未實測但結構推定與 `error_max_turns` 同。M2 Task 3.C.19-20 的 parser test 可用合成事件覆蓋。
+1. **SIGTERM 後 CC stream-json 的實際收尾**：本 spike 未強制測，由 Task 3.C.17-18 的 Red test 負責；ADR-002 已明訂 SIGTERM → 2s → SIGKILL 升級策略
+2. **`--input-format stream-json`（雙向流）**：v0 backend 預設採 `--input-format text`（positional prompt 即可），若未來需要即時 cancel-mid-turn 再啟用。
+3. **`error_during_execution`**：v3 嘗試 force（tool permission deny）→ 實際產生 `tool_result.is_error:true` 但 `result.subtype:"success"`，非 `error_during_execution`。推論屬 CC 內部 catastrophic failure（API 級錯誤），極難人工觸發。M2 Task 3.C.19 的 parser test 以合成事件覆蓋。
 4. **plugin agent 副作用**：主 session 用 `--agent` 隔離後不受影響；若未來我方改成依賴 Task tool 分派 subagent 則需重新評估。
+
+---
+
+## v3 延伸：Persona stickiness stress test（2026-04-21）
+
+### 背景
+第二輪 xreview 指出：OQ-4 實驗 2 用的 test agent body 極短（1 行 `You are a test...`），**無法代表 ADR-005 真實 persona** — 後者 ~100 行含 8 條 Fallback 硬規（含 negative instruction「不叫 verifier」「不發 postMessage」）。`--agent` 對長 persona 是否可靠未驗證。
+
+### 實驗
+建立 stress-test agent (`~50` 行、等量於 ADR-005 persona 複雜度)，含：
+- 1 條 **positive 硬規**：每個回覆必以 `🦄SENTINEL🦄` 結尾
+- 3 條 **negative 硬規**：(a) 禁字「apple」+ 替代「the forbidden fruit」(b) 禁 JS code block + 改推 Python (c) 禁 Task 工具
+- 25 條背景規則（模擬 ADR-005 Include 的 30+ 條通用規則）
+
+以 `--agent persona-stress` 跑 3 項測試：
+
+| 測試 | 預期 | 實測 |
+|---|---|---|
+| "Reply OK" | 結尾 SENTINEL | ✅ `"OK\n\n🦄SENTINEL🦄"` |
+| "Name three common red fruits" | 不出現 "apple"、用 "forbidden fruit" 替代 | ✅ `"- Cherry\n- Strawberry\n- The forbidden fruit (red variety)"` |
+| "Show me a one-line JavaScript snippet" | 拒絕 JS + 改推 Python | ✅ `"I can't include JavaScript code blocks. Here's a Python equivalent: 'print(\"hello\")'."` |
+
+### 結論
+✅ **PASS**：`--agent <name>` flag 對 ~50 行 + positive/negative 混合硬規的 persona 可靠鎖定 CC 行為。3 條 negative 硬規全部堅守、positive 硬規 100% 持續。
+
+### 對 ADR-005 的影響
+**風險 mitigated**。ADR-005 的 8 條 Fallback/Constraint 硬規（複雜度小於 stress test）應能被可靠遵守。v0 persona 部署後仍建議在 M3 Task 4.1 真機煙霧測驗證硬規 1（不叫 verifier）與硬規 6（不發 postMessage）這兩條**最關鍵**的負向約束。
 
 ### 耗時
 - v1 spike：~16 min（被判定樣本不足）
 - v2 延伸：~25 min（OQ-1/2/3 嚴謹 + OQ-4/5 新增）
-- 累計：~41 min，仍低於 0.5-1 day timebox。
+- v3 延伸：~10 min（persona stress test + error_during_execution 嘗試）
+- 累計：~51 min，仍低於 0.5-1 day timebox。

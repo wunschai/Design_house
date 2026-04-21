@@ -10,7 +10,8 @@
     "./events": "./src/events.ts",
     "./mcp-tools": "./src/mcp-tools.ts",
     "./db-types": "./src/db-types.ts",
-    "./paths": "./src/paths.ts"
+    "./paths": "./src/paths.ts",
+    "./weighted-length": "./src/weighted-length.ts"
   },
   "scripts": {
     "build": "tsc -p .",

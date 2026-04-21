@@ -16,9 +16,11 @@ export type McpErrorCodeValue = (typeof McpErrorCode)[keyof typeof McpErrorCode]
 
 // ── read_file ─────────────────────────────────────────────────────
 
-export const readFileInputSchema = z.object({
-  path: z.string().min(1),
-});
+export const readFileInputSchema = z
+  .object({
+    path: z.string().min(1),
+  })
+  .strict();
 
 export const readFileOutputSchema = z.object({
   content: z.string(),
@@ -72,9 +74,11 @@ export type ListFilesOutput = z.infer<typeof listFilesOutputSchema>;
 
 // ── show_to_user ──────────────────────────────────────────────────
 
-export const showToUserInputSchema = z.object({
-  path: z.string().min(1),
-});
+export const showToUserInputSchema = z
+  .object({
+    path: z.string().min(1),
+  })
+  .strict();
 
 export const showToUserOutputSchema = z.object({
   ok: z.literal(true),
@@ -85,9 +89,11 @@ export type ShowToUserOutput = z.infer<typeof showToUserOutputSchema>;
 
 // ── done ─────────────────────────────────────────────────────────
 
-export const doneInputSchema = z.object({
-  path: z.string().min(1),
-});
+export const doneInputSchema = z
+  .object({
+    path: z.string().min(1),
+  })
+  .strict();
 
 export const doneOutputSchema = z.object({
   ok: z.boolean(),

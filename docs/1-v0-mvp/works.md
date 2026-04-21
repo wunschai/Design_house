@@ -136,3 +136,55 @@ M2 實作可按原設計推進，無阻塞項。
 
 ### 耗時
 v1: ~16 min + v2: ~25 min + 文件回修: ~20 min = ~61 min 總累計，仍在 0.5-1 d timebox 內。
+
+---
+
+## M1 v3 再延伸 spike — 因第二輪 xreview 抓到深度盲區 — 2026-04-21
+
+### 背景
+第二輪 xreview 兩個 Opus 分析 a97cc92 後找出 **6 條🔴 + 10 條🟡**，其中最關鍵：
+- **`--agent` + 長 persona 可靠性未驗證**（OQ-4 實驗 2 只用 1 行 body）
+- Fastify v4/v5 spec vs code drift
+- correlationId 生成責任未明
+- iframe sandbox 未 spec
+- AC-8.3 symlink 防禦未閉環
+- ADR-005 Include 漏 L38 bulk-copy 規則
+
+使用者決議「對一樣的做法」（全修 + 兩個 Opus check）。
+
+### 做法
+- **v3 spike**：撰寫 ~50 行 stress-test persona（1 positive + 3 negative + 25 padding）實測 `--agent` 可靠性 → 3/3 全過，ADR-005 風險 mitigated
+- **spec 回修**：ADR-009 Fastify v5、新 ADR-010（correlationId ULID by mcp-server）、ADR-002 新增 `--permission-mode dontAsk` + SIGTERM→SIGKILL 升級、ADR-005 Include 補 L38、新 §4.1 iframe sandbox 規則、§邊界案例 +4 條（#17-20）
+- **tasks 回修**：Task 3.B.5/7/9/11/13 強制要求 `fs.realpathSync` guard、Task 3.D.13 iframe sandbox 具體化、Task 3.A.2 原文來源路徑明述、29+ AC → 34
+- **shared types 回修**：mcp-tools.ts 5 個 input schema 全 `.strict()`（前版只有 write_file/list_files 有）+3 個新 test；新增 `weighted-length.ts` helper + 23 tests 供 AC-3.0 / AC-4.7 共用（不依賴各 app 自寫計數）
+
+### 對 spec 的傳導修正
+1. **ADR-009** Fastify v4 → **v5**（反映實作）
+2. **新 ADR-010** — correlationId 由 mcp-server 生成 ULID、backend idempotency dedupe
+3. **ADR-002** spawn cmd 加 `--permission-mode dontAsk`；Consequences 加 SIGTERM 2s → SIGKILL 升級；Alternatives 加「僅 SIGTERM 不升級」與「default permission mode」的拒絕理由
+4. **ADR-005 Include** 補 L38 bulk-copy 紀律；啟用機制段加 v3 stress test 佐證
+5. **§2.2** tool-start 加 `parentToolUseId` 欄位（defensive passthrough）
+6. **§3 MCP Tool** 表 §3.4 show_to_user 加「v0 vs 原版 fire-and-forget 差異」語意註記（已於前輪加）
+7. **§4** files endpoint 標註 same-origin 要求；**新 §4.1** iframe sandbox + origin 規則
+8. **§邊界案例** 新增 #17（10 MB body）、#18（ping/pong 斷線）、#19（correlationId idempotency）、#20（SIGTERM→SIGKILL）
+9. **§Open Questions** 殘留風險第 3 點改寫：error_during_execution 實測結果
+
+### 對 tasks.md 的傳導修正
+10. Task 3.A.2 原文路徑明述
+11. Task 3.B.5/7/9/11/13 全改成「必呼叫 `fs.realpathSync` 驗 resolved 落在 projectRoot」
+12. Task 3.B.13 明述 correlationId 由 `ulid()` 生
+13. Task 3.D.13 Preview panel 明述 `sandbox="allow-scripts allow-same-origin"` + 5s load timeout fallback
+14. "29+ AC" → "34 AC" 全替換
+
+### 對 packages/shared 的傳導修正
+15. `mcp-tools.ts`：5 個 input schema 全 `.strict()`（前版只 2 個），+3 tests
+16. `weighted-length.ts` 新增：`weightedLength()` / `isCjkCodePoint()` / `isShortConceptualPrompt()` / `isWithinSummaryLimit()`，+23 tests，匯出到主 index + subpath `./weighted-length`
+17. 測試總數：165 → 191 passed / 0 failed，typecheck 4/4 packages 綠
+
+### 殘留 v0 風險（最終確認）
+- SIGTERM 行為 → ADR-002 已明訂策略、M2 Task 3.C.17-18 驗收
+- error_during_execution → 合成事件覆蓋（v3 確認難以自然觸發）
+- `--input-format stream-json` → deferred v1+
+
+### 耗時（累計）
+v1: ~16 + v2: ~25 + 文件回修: ~20 + v3 spike: ~10 + v3 文件回修: ~30 = **~101 min** 累計，仍在 0.5-1 d timebox 內。
