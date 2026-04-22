@@ -65,10 +65,10 @@ async function handleReadFile(
 
   // realpathSync guard（AC-8.3）
   try {
-    const { realpathSync } = await import("node:fs");
     const resolved = realpathSync(filePath);
     const rootResolved = realpathSync(projectRoot);
-    if (!resolved.startsWith(rootResolved)) {
+    // 用 sep 防 prefix-sibling bypass（e.g. /ws/projects/foo vs /ws/projects/foobar）
+    if (resolved !== rootResolved && !resolved.startsWith(rootResolved + PATH_SEP)) {
       return { ok: false, error: { code: "PATH_TRAVERSAL", message: "Path escapes project root" } };
     }
   } catch {
@@ -207,11 +207,21 @@ async function handleListFiles(
 
 async function handleShowToUser(
   projectSlug: string,
-  _projectRoot: string,
+  projectRoot: string,
   args: { path?: string }
 ): Promise<ToolResult> {
   if (!args.path) {
     return { ok: false, error: { code: "PATH_TRAVERSAL", message: "path is required" } };
+  }
+
+  // Path validation（防 CC 跨 project 顯示、或傳 .. 到 UI）
+  try {
+    joinProject(projectRoot, args.path);
+  } catch (e) {
+    if (e instanceof PathTraversalError) {
+      return { ok: false, error: { code: "PATH_TRAVERSAL", message: e.message } };
+    }
+    throw e;
   }
 
   // 廣播 show-to-user 事件（fire-and-forget，不等 UI 回應）

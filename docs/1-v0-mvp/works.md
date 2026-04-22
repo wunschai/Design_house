@@ -343,3 +343,24 @@ spec AC-1.3 + §4.1 從「三欄」改成「雙欄 + Workspace」，註記偏離
 
 ### 累計耗時（M3 至本 commit）
 Task 4.7/4.8 Playwright：~30 min · CC flags debug：~20 min · UI research + 重構：~50 min · works.md 收尾：~10 min = **~110 min**。
+
+---
+
+## xreview 收斂（2026-04-20, v0 commit 前整體 review）
+
+派 2 位 Opus reviewer（real-bug/security + spec-fidelity），aggregate 後找出 Critical/Important 共 6 項，實修 5 項：
+
+| 項 | 位置 | 嚴重度 | 修法 |
+|---|---|---|---|
+| 1 | `api.ts:229` + `internal.ts:71` `startsWith` 無 sep | Critical | 加 `+ PATH_SEP` 防 prefix-sibling bypass |
+| 2 | `internal.ts:handleShowToUser` 無路徑驗證 | Critical | 補 `joinProject()` + `PathTraversalError` 捕捉 |
+| 3 | `ws.ts` server keepalive 用錯 pong 事件（protocol vs app-level） | Important | 改 app-level：`ClientToServerEvent` 加 `pongSchema`；server 新增 `case "pong"` 重置 missedPongs；client 收 server `{type:"ping"}` 時回 `{type:"pong"}`。`ServerToClientEvent` 同步加 `pingSchema` |
+| 4 | `stream-parser.ts:75` empty-text `break` | Important | 改 `continue`（與 thinking block 同形態 bug） |
+| 5 | `spec.md` ADR-002/003 與實作脫節 | Important | 補 Amendment 區塊記錄實際 spawn flags（`bypassPermissions` + `--tools ""` + 25 項 `--disallowedTools`）與 frontmatter `tools:` 非強制邊界 |
+| 6 | iframe `allow-same-origin` + `allow-scripts` | Critical（context-bound）| 按使用者決策：記 `§邊界 21` 為已知風險，v0 單機單人接受 |
+
+三欄 → 雙欄文件漂移 cleanup：tasks.md / App.tsx 頂註解 / plan.md / README.md 一併更新。
+
+Minor 3 項（correlation-cache setTimeout 未 clearTimeout、session.ts substring 比對寬鬆、spawner SIGKILL timer 正常退出未清）— defer 到 v0.1。
+
+**驗證**：pnpm -r typecheck 4/4 綠 · pnpm -r test 274 unit 全綠 · pnpm --filter frontend test:e2e 6/6 綠。

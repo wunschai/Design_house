@@ -74,12 +74,13 @@ Design_house/
 
 ---
 
-## 開發狀態（2026-04-21）
+## 開發狀態（2026-04-20）
 
 - ✅ M0 — Monorepo scaffold + shared contracts（192 tests）
 - ✅ M1 — 三項技術 spike（OQ-1/2/3 + OQ-4/5 新增，4 輪迭代收斂）
-- ⏳ M2 — 四條平行工作線（persona / MCP / backend / frontend）
-- ⏳ M3 — 整合 + E2E smoke + 34 AC 驗收
+- ✅ M2 — 四條平行工作線（persona / MCP / backend / frontend）
+- ✅ M3 — 整合 + E2E smoke（466 unit + 6 e2e；34 AC 中 19 自動/手動驗證、8 待真 CC 分支、7 手動觀察）
+- 🔄 v0 commit 前 xreview 修復中（path sep、show_to_user validate、WS keepalive、stream-parser continue、spec ADR-002/003 Amendment）
 
 ---
 

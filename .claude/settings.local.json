@@ -73,7 +73,10 @@
       "WebFetch(domain:support.claude.com)",
       "WebFetch(domain:muz.li)",
       "Bash(timeout 20 claude -p \"Briefly introduce yourself in one sentence. What kind of agent are you?\" --agent design-artifact --output-format stream-json --verbose)",
-      "Bash(timeout 20 claude -p \"Briefly introduce yourself in one sentence. What kind of agent are you?\" --output-format stream-json --verbose)"
+      "Bash(timeout 20 claude -p \"Briefly introduce yourself in one sentence. What kind of agent are you?\" --output-format stream-json --verbose)",
+      "Bash(curl -sS -m 3 -X POST http://127.0.0.1:31823/api/projects -H \"content-type:application/json\" -d '{\"name\":\"probe-test\"}')",
+      "Bash(curl -sS -m 3 -X DELETE http://127.0.0.1:31823/api/projects/probe-test)",
+      "Bash(cygpath -w /tmp/xreview-f6yBBn.md)"
     ]
   }
 }

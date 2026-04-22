@@ -21,7 +21,7 @@ UI 聊天 ─→ CC CLI subprocess ─→ HTML artifact ─→ iframe 預覽
 
 - 本機單 process 跑得起來（加 CC CLI 生的子進程）
 - 使用者在瀏覽器裡輸入 prompt → CC 產出 HTML → 落在 `projects/<slug>/` → UI iframe 自動預覽
-- 三欄佈局（檔案樹 / 對話 / 預覽）+ shadcn/ui 風格
+- 雙欄佈局（Chat / Workspace：tab bar + 預覽 + 檔案抽屜）+ shadcn/ui 風格（M3 smoke 後對齊原版 Claude Design；v0 初版採三欄，歷史保留於 works.md §M3 §Layout refactor）
 - 5 個 MCP 工具：`read_file`、`write_file`、`list_files`、`show_to_user`、`done`
 - 所有狀態落地（重開瀏覽器後專案、對話、檔案都在）
 
@@ -34,7 +34,7 @@ UI 聊天 ─→ CC CLI subprocess ─→ HTML artifact ─→ iframe 預覽
 | 工程強度 | Robust：full MCP + subagent persona | 忠實度最高、擴充最乾淨 |
 | 架構變體 | **B-1**：分離的 stdio MCP binary，HTTP POST 回呼 | 隔離乾淨、低延遲、Windows 相容 |
 | Backend runtime | Node.js + TypeScript | MCP TS SDK 最成熟、跟 CC 同生態 |
-| UI 保真度 | Layout parity（三欄 + shadcn 風格） | 體感近原版但不陷入像素地獄 |
+| UI 保真度 | Layout parity（雙欄 Chat/Workspace + shadcn 風格；M3 後對齊原版） | 體感近原版但不陷入像素地獄 |
 | 前端框架 | React + Vite + shadcn/ui | 生態最齊、shadcn 美學匹配 |
 | 儲存 | SQLite（better-sqlite3） | 結構化、同步 API 好寫 |
 | 專案 root | `D:\sideprojct\Design_house\projects\<slug>\` | 單使用者情境下簡單直接 |
@@ -148,7 +148,7 @@ D:\sideprojct\Design_house\
 ├── apps\
 │   ├── backend\           ← Fastify web server、DB ownership、CC spawner、fs watcher
 │   ├── mcp-server\        ← stdio MCP，5 tools，callback via HTTP POST
-│   └── frontend\          ← React + Vite + shadcn/ui，三欄 layout
+│   └── frontend\          ← React + Vite + shadcn/ui，雙欄 layout（Chat / Workspace）
 ├── packages\
 │   └── shared\            ← 共用 types（events, tool contracts, db rows）
 ├── projects\              ← 使用者 HTML artifacts（.gitignore）

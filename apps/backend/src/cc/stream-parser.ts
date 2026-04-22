@@ -72,7 +72,7 @@ export function parseStreamLine(
         if (blockType === "text") {
           // chat-delta — 逐 delta 推送
           const text = (block["text"] as string) ?? "";
-          if (!text) break;
+          if (!text) continue; // 空 text 不該吃掉同一 assistant message 的 tool_use
 
           // 取得或建立此 assistant message 的 buffer
           let buf = _assistantBuffers.get(projectSlug);

@@ -134,6 +134,7 @@ export const ClientToServerEvent = z.discriminatedUnion("type", [
   cancelTurnSchema,
   doneAckSchema,
   pingSchema,
+  pongSchema,
 ]);
 
 export const ServerToClientEvent = z.discriminatedUnion("type", [
@@ -147,6 +148,7 @@ export const ServerToClientEvent = z.discriminatedUnion("type", [
   doneRequestSchema,
   turnEndSchema,
   errorSchema,
+  pingSchema,
   pongSchema,
 ]);
 

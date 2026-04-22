@@ -2,7 +2,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import Database from "better-sqlite3";
 import { mkdirSync, existsSync, statSync, readdirSync, readFileSync } from "node:fs";
-import { join, extname } from "node:path";
+import { join, extname, sep as PATH_SEP } from "node:path";
 import {
   insertProject,
   getProject,
@@ -226,7 +226,8 @@ export async function apiRoutes(app: FastifyInstance, opts: ApiRouteOptions): Pr
       const { realpathSync } = await import("node:fs");
       resolvedPath = realpathSync(joined);
       const projectDirResolved = realpathSync(join(projectsRoot, req.params.slug));
-      if (!resolvedPath.startsWith(projectDirResolved)) {
+      // 用 sep 防 prefix-sibling bypass（e.g. /projects/foo vs /projects/foobar）
+      if (resolvedPath !== projectDirResolved && !resolvedPath.startsWith(projectDirResolved + PATH_SEP)) {
         return reply.status(403).send({ error: "Path traversal denied" });
       }
     } catch {

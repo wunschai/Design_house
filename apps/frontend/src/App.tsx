@@ -1,4 +1,4 @@
-// App — 三欄 layout + project switcher + WS provider
+// App — 雙欄 layout（Chat / Workspace）+ project switcher + WS provider
 import React, { useState, useEffect, createContext, useContext, useCallback } from "react";
 import { Toaster } from "sonner";
 import { toast } from "sonner";

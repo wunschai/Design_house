@@ -78,9 +78,16 @@ function sendError(ws: WebSocket, code: string, message: string, projectSlug?: s
 }
 
 // NFR-7: ping/pong keepalive — 每 30s 發 ping；2 次 pong 不回 → close(1001)
+// 採 app-level（JSON 訊息）pong——client 收到 {type:"ping"} 後回 {type:"pong"}，
+// 透過 socket.on("message") 裡的 pong case 呼叫 resetKeepaliveCounter 重置 missedPongs。
 const PING_INTERVAL_MS = 30_000;
 
-function setupKeepalive(ws: WebSocket): () => void {
+interface KeepaliveHandle {
+  cleanup: () => void;
+  reset: () => void;
+}
+
+function setupKeepalive(ws: WebSocket): KeepaliveHandle {
   let missedPongs = 0;
 
   const timer = setInterval(() => {
@@ -97,13 +104,9 @@ function setupKeepalive(ws: WebSocket): () => void {
     ws.send(JSON.stringify({ type: "ping" }));
   }, PING_INTERVAL_MS);
 
-  // 收到 pong 時重置
-  const handlePong = () => { missedPongs = 0; };
-  ws.on("pong", handlePong);
-
-  return () => {
-    clearInterval(timer);
-    ws.off("pong", handlePong);
+  return {
+    cleanup: () => clearInterval(timer),
+    reset: () => { missedPongs = 0; },
   };
 }
 
@@ -118,12 +121,7 @@ export async function wsRoutes(app: FastifyInstance, opts: WsRouteOptions): Prom
 
   app.get("/ws", { websocket: true }, (socket, _req) => {
     let subscribedProject: string | null = null;
-    let cleanupKeepalive: (() => void) | null = null;
-
-    // 處理 pong（client 回應 server 的 ping）
-    socket.on("pong", () => {
-      // handled by keepalive setup
-    });
+    let keepalive: KeepaliveHandle | null = null;
 
     socket.on("message", (rawData) => {
       let parsed: unknown;
@@ -149,6 +147,12 @@ export async function wsRoutes(app: FastifyInstance, opts: WsRouteOptions): Prom
           break;
         }
 
+        case "pong": {
+          // client 回應 server 的 app-level ping — 重置 missedPongs
+          keepalive?.reset();
+          break;
+        }
+
         case "subscribe": {
           const project = getProject(db, msg.projectSlug);
           if (!project) {
@@ -169,8 +173,8 @@ export async function wsRoutes(app: FastifyInstance, opts: WsRouteOptions): Prom
           _pool.get(subscribedProject)!.add(socket);
 
           // 啟動 keepalive
-          if (!cleanupKeepalive) {
-            cleanupKeepalive = setupKeepalive(socket);
+          if (!keepalive) {
+            keepalive = setupKeepalive(socket);
           }
 
           // 回傳 ready + current session id
@@ -278,11 +282,11 @@ export async function wsRoutes(app: FastifyInstance, opts: WsRouteOptions): Prom
           _pool.delete(subscribedProject);
         }
       }
-      cleanupKeepalive?.();
+      keepalive?.cleanup();
     });
 
     socket.on("error", () => {
-      cleanupKeepalive?.();
+      keepalive?.cleanup();
     });
   });
 }

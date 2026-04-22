@@ -164,6 +164,14 @@ export function createWsManager(options: {
         missedPongs = 0;
       }
 
+      // server 的 app-level ping → 回 pong，重置 server 側 missedPongs
+      if (parsed.data.type === "ping") {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "pong" }));
+        }
+        return; // 不需再傳給 onEvent
+      }
+
       onEvent(parsed.data);
     };
 

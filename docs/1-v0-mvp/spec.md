@@ -381,6 +381,7 @@ SQLite 以 WAL mode 運行（`PRAGMA journal_mode=WAL`）。`raw_log` 僅對**�
 18. **WS 連線連續 2 次 ping 未回 pong（NFR-7）**：backend 主動關閉 connection（`close code 1001`）；UI 偵測斷線後指數退避重連（見 `use-ws` hook 測試）。
 19. **mcp-server HTTP retry 造成 `/internal/mcp-event` 同 correlationId 二次送達**：backend 查 in-memory pending map / recent responses，以 cached result 回覆，不重複廣播 `done-request`（ADR-010 idempotency）。
 20. **CC subprocess SIGTERM 後 2s 未 exit**：backend 升級 SIGKILL（TerminateProcess on Windows），並發出 WS `turn-end reason:"timeout"` 或 `"cancelled"`（視觸發源）。
+21. **iframe artifact 可透過 `top.fetch` 呼叫 backend API（已知風險）**：`Preview.tsx` 使用 `sandbox="allow-scripts allow-same-origin"` 以保留同源 `console.error` 捕捉（AC-4.2 auto-fix 依賴）。代價：artifact 腳本理論上可呼叫 `/api/projects/*`（含 DELETE）。v0 單使用者本機、CC persona 輸出預期可信，接受此風險；未來若開放多使用者或遠端部署，需改用 blob: URL 跨源隔離或另行 token guard。
 
 ## ADR
 
@@ -431,6 +432,31 @@ claude --print \
 
 **Alternatives rejected.** `--continue`（cwd-global 無法區分專案）；全自手寫 context replay（複雜、易錯）；`--bare` 模式（違反 ADR-001 訂閱認證約束）；`--permission-mode default`（subprocess 會卡等 stdin 授權導致 turn 永不結束）；僅 SIGTERM 不升級 SIGKILL（Windows 下 CC 可能不回應 SIGTERM，turn 無法終止）。
 
+**Amendment · 2026-04-20（M3 smoke 實測後）** — 實際 spawn flags 為：
+```
+claude --print \
+       --agent design-artifact \
+       --mcp-config ./.mcp.json \
+       --strict-mcp-config \
+       --tools "" \
+       --disallowedTools Bash Read Write Edit MultiEdit Glob Grep Task \
+                        WebSearch WebFetch TodoWrite ExitPlanMode NotebookEdit \
+                        AskUserQuestion Skill ToolSearch \
+                        EnterPlanMode EnterWorktree ExitWorktree TaskOutput TaskStop \
+                        ScheduleWakeup CronCreate CronDelete CronList \
+                        Monitor PushNotification RemoteTrigger \
+       --permission-mode bypassPermissions \
+       --output-format stream-json --verbose --max-turns 50 \
+       [--resume <session-id>] [positional prompt]
+```
+
+差異與理由：
+- `--permission-mode dontAsk` → **`bypassPermissions`**：實測 `dontAsk` 語意為「不問 = 拒絕」，會導致 write/edit 類 tool 被拒執行；`bypassPermissions` 才是「允許不問」的正確模式
+- 新增 **`--tools ""`**：ADR-003 原推論「subagent frontmatter `tools:` 空白=封鎖 CC 內建工具」在 M3 smoke 中被證偽（CC 仍可自行 spawn Bash 等內建工具）。必須靠 spawner 端的 `--tools ""` + 明確列舉 `--disallowedTools` 雙重把關
+- `--disallowedTools` 顯式列出 CC 所有已知內建工具：實際封鎖邊界的唯一權威來源
+
+此 Amendment 覆蓋 ADR-002 Decision block 中對 `--permission-mode dontAsk` 的描述；ADR-003 同日有對應 Amendment。
+
 ---
 
 ### ADR-003 — Subagent tool allowlist 只含 MCP 工具
@@ -467,6 +493,12 @@ tools:
 - ⚠️ `snip`/`TodoWrite` 封鎖代表 CC 長對話無自動壓縮；v0 接受 context 滿載時使用者需重開 session 或開新專案。相關改善延 v1+。
 
 **Alternatives rejected.** 允許 CC 原生 Read/Write + MCP 並存（事件不單一、FS watcher 與 MCP 事件有時序競爭）；完全靠 prompt sentinel（已於 brainstorming 階段排除）。
+
+**Amendment · 2026-04-20（M3 smoke 實測後）** — subagent frontmatter `tools:` 在 CC 2.1.116 實測中**並非強制執行邊界**：即使 agent 的 `tools:` 欄位未列出 Bash/Read/Write，CC 仍會使用這些內建工具。真正的封鎖機制移到 spawner 端：
+
+- 單一真實來源：`apps/backend/src/cc/spawner.ts` 的 `--tools ""` + `--disallowedTools <list>`（見 ADR-002 Amendment）
+- frontmatter `tools:` 清單仍保留（語意對齊、未來 CC 版本可能會 enforce），但**不再視為唯一守門**
+- 若新增 CC 內建工具（例如 2.1.x → 2.2 可能出現的 `NotebookEdit` 等），務必同步更新 spawner 的 `--disallowedTools` 清單
 
 ---
 

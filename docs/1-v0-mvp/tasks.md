@@ -163,7 +163,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 > **範圍**：`apps/frontend/`
 > **依賴**：M0 shared types（events schema）
 > **介面契約**：spec §1 REST、spec §2 WS、 spec §3 各工具的事件流
-> **驗證方式**：`pnpm --filter frontend test` 全過；`pnpm --filter frontend dev` 手動測三欄渲染 + 主要互動（需配合 backend 真跑 — 整合在 M3）
+> **驗證方式**：`pnpm --filter frontend test` 全過；`pnpm --filter frontend dev` 手動測雙欄渲染（Chat / Workspace）+ 主要互動（需配合 backend 真跑 — 整合在 M3；M3 後重構為雙欄 + Workspace tab bar）
 > **AC 對應**：AC-1.3、AC-2.2 UI、AC-3.0 Understand UI（觸發時機）、AC-3.1 busy indicator、AC-3.3 streaming 顯示、AC-3.4 tool 事件顯示、AC-4.2 iframe load+3s collect、AC-4.6/4.7 summary 顯示、AC-6.1 瀏覽器重開還原
 
 - [x] **Task 3.D.1**（M）：Vite + React 18 + TS + Tailwind + shadcn/ui 初始化（scaffold-only；commit `"M2/D: vite+shadcn scaffold"`）
@@ -202,8 +202,8 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
   - **artifact 後覆寫 console** 的風險：用 `addEventListener('error', …)` 主要抓 uncaught exceptions；`console.error` 封裝只在 3s 收集窗期間必要
   - load 超過 **5s 未觸發** → ack `{loaded:false, consoleErrors:[]}` 並顯示 fallback 訊息（計入 AC-4.5 timeout 分支）
   - done-request 收到時，記下 start 時戳、等 onLoad、load 後繼續收 3s 內的 error，視窗結束 flush `done-ack{correlationId, loaded:true, consoleErrors}`
-- [x] **Task 3.D.14**（S）：App.tsx 三欄 layout 測試 (Red) — 佈局結構、project switcher 位置
-- [x] **Task 3.D.15**（S）：App.tsx 實作 (Green) — shadcn `Resizable` 三欄 + 頂部 project switcher + error toast
+- [x] **Task 3.D.14**（S）：App.tsx layout 測試 (Red) — 佈局結構、project switcher 位置（M3 後重構為雙欄：Chat / Workspace）
+- [x] **Task 3.D.15**（S）：App.tsx 實作 (Green) — shadcn `Resizable` 雙欄（M2 初版三欄、M3 重構為雙欄 + Workspace tab bar）+ 頂部 project switcher + error toast
 - [x] **Task 3.D.16**（S）：Bootstrap `pnpm dev` 自動開啟瀏覽器（concurrently / open）— 對應 AC-1.3「瀏覽器打開 → ≤ 3s 顯示」
 - [x] **Task 3.D.17**（S）：commit worktree `"M2/D: frontend shell"`
 
@@ -259,7 +259,7 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 |---|---|
 | AC-1.1 port 綁定 5s | 3.C.3/3.C.4、4.6 |
 | AC-1.2 127.0.0.1 only | 3.C.3/3.C.4 |
-| AC-1.3 三欄 ≤ 3s | 3.D.14-16、4.1 |
+| AC-1.3 雙欄（Chat / Workspace） ≤ 3s | 3.D.14-16、4.1（M3 重構後） |
 | AC-1.4 SQLite 自動初始化 | 1.8/1.9、3.C.1/3.C.2 |
 | AC-2.1 首次建預設專案 | 3.C.7/3.C.8 |
 | AC-2.2 切換/新增/刪除 UI | 3.C.5/3.C.6 + 3.D.6/3.D.7 + 3.D.14 |
