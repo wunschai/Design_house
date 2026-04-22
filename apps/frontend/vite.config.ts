@@ -28,5 +28,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
+    // Playwright 的 e2e/ 由 `pnpm test:e2e` 執行、不在 vitest scope 內
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
   },
 });

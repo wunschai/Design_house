@@ -66,7 +66,12 @@
       "Bash(tasklist //FI \"IMAGENAME eq claude.exe\")",
       "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
       "Bash(tasklist //V //FI \"IMAGENAME eq claude.exe\")",
-      "Bash(wmic process *)"
+      "Bash(wmic process *)",
+      "Bash(GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=accept-new\" git push -u origin main)",
+      "Bash(gh auth *)",
+      "WebSearch",
+      "WebFetch(domain:support.claude.com)",
+      "WebFetch(domain:muz.li)"
     ]
   }
 }

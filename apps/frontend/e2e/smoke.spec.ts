@@ -7,7 +7,7 @@ const BACKEND = "http://127.0.0.1:31823";
 const UI = "http://127.0.0.1:5173";
 
 test.describe("v0 smoke", () => {
-  test("UI boots and renders the 3-column layout (AC-1.3)", async ({ page }) => {
+  test("UI boots and renders the 2-column layout (AC-1.3)", async ({ page }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
@@ -20,10 +20,18 @@ test.describe("v0 smoke", () => {
     // Header should render
     await expect(page.getByText("Design House")).toBeVisible({ timeout: 5_000 });
 
-    // 3 panels (labels we can pin in code)
-    await expect(page.getByTestId("panel-file-tree")).toBeVisible();
+    // 2-column layout: chat left, workspace (tab bar + preview + drawer toggle) right
     await expect(page.getByTestId("panel-chat")).toBeVisible();
+    await expect(page.getByTestId("panel-workspace")).toBeVisible();
+    await expect(page.getByTestId("tab-bar")).toBeVisible();
+    await expect(page.getByTestId("files-drawer-toggle")).toBeVisible();
     await expect(page.getByTestId("panel-preview")).toBeVisible();
+
+    // File drawer is hidden by default
+    await expect(page.getByTestId("drawer-files")).toHaveCount(0);
+    // Click toggle → drawer opens → FileTree renders inside
+    await page.getByTestId("files-drawer-toggle").click();
+    await expect(page.getByTestId("drawer-files")).toBeVisible();
 
     // No pageerror or React hydration error
     const fatal = consoleErrors.filter((e) =>
@@ -69,7 +77,7 @@ test.describe("v0 smoke", () => {
   test("visual snapshot — screenshot the booted UI", async ({ page }) => {
     await page.goto(UI);
     await page.waitForLoadState("networkidle");
-    await expect(page.getByTestId("panel-file-tree")).toBeVisible();
+    await expect(page.getByTestId("panel-workspace")).toBeVisible();
     await page.screenshot({ path: "e2e/artifacts/ui-booted.png", fullPage: true });
   });
 });

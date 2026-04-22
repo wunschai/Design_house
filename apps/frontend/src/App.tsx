@@ -20,9 +20,8 @@ import {
 } from "./components/ui/dialog";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
-import FileTree from "./panels/FileTree";
 import Chat from "./panels/Chat";
-import Preview from "./panels/Preview";
+import Workspace from "./panels/Workspace";
 import { useProjectStore } from "./hooks/use-project";
 import { useWs, type UseWsReturn } from "./hooks/use-ws";
 
@@ -97,7 +96,6 @@ function WsProvider({
 
 export default function App() {
   const { projects, current_slug, load, setCurrent, create, remove } = useProjectStore();
-  const [preview_path, set_preview_path] = useState<string | null>(null);
   const [show_new_dialog, set_show_new_dialog] = useState(false);
   const [new_project_name, set_new_project_name] = useState("");
   const [creating, set_creating] = useState(false);
@@ -137,11 +135,9 @@ export default function App() {
         currentProject={currentProject}
         projects={projects}
         current_slug={current_slug}
-        preview_path={preview_path}
         show_new_dialog={show_new_dialog}
         new_project_name={new_project_name}
         creating={creating}
-        onSetPreviewPath={set_preview_path}
         onSetShowNewDialog={set_show_new_dialog}
         onSetNewProjectName={set_new_project_name}
         onSetCurrent={setCurrent}
@@ -158,11 +154,9 @@ interface AppInnerProps {
   currentProject: { slug: string; name: string } | null;
   projects: Array<{ slug: string; name: string }>;
   current_slug: string | null;
-  preview_path: string | null;
   show_new_dialog: boolean;
   new_project_name: string;
   creating: boolean;
-  onSetPreviewPath: (path: string | null) => void;
   onSetShowNewDialog: (v: boolean) => void;
   onSetNewProjectName: (v: string) => void;
   onSetCurrent: (slug: string | null) => void;
@@ -174,11 +168,9 @@ function AppInner({
   currentProject,
   projects,
   current_slug,
-  preview_path,
   show_new_dialog,
   new_project_name,
   creating,
-  onSetPreviewPath,
   onSetShowNewDialog,
   onSetNewProjectName,
   onSetCurrent,
@@ -239,24 +231,11 @@ function AppInner({
         </DropdownMenu>
       </header>
 
-      {/* 三欄 */}
+      {/* 雙欄 layout — 對齊 Claude Design 原版：左對話、右工作區（tab bar + preview + 檔案抽屜）*/}
       {current_slug ? (
         <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
-          {/* 左：檔案樹 */}
-          <ResizablePanel defaultSize={20} minSize={10} aria-label="檔案樹面板">
-            <div data-testid="panel-file-tree" className="h-full">
-              <FileTree
-                projectSlug={current_slug}
-                ws={ws}
-                onSelect={(path) => onSetPreviewPath(path)}
-              />
-            </div>
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          {/* 中：對話 */}
-          <ResizablePanel defaultSize={50} minSize={25} aria-label="對話面板">
+          {/* 左：對話（~45%）*/}
+          <ResizablePanel defaultSize={45} minSize={25} aria-label="對話面板">
             <div data-testid="panel-chat" className="h-full">
               <Chat projectSlug={current_slug} ws={ws} />
             </div>
@@ -264,16 +243,9 @@ function AppInner({
 
           <ResizableHandle withHandle />
 
-          {/* 右：預覽 */}
-          <ResizablePanel defaultSize={30} minSize={15} aria-label="預覽面板">
-            <div data-testid="panel-preview" className="h-full">
-              <Preview
-                projectSlug={current_slug}
-                currentPath={preview_path}
-                ws={ws}
-                onPathChange={onSetPreviewPath}
-              />
-            </div>
+          {/* 右：Workspace — tab bar + iframe + file drawer（~55%）*/}
+          <ResizablePanel defaultSize={55} minSize={30} aria-label="工作區">
+            <Workspace projectSlug={current_slug} ws={ws} />
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (

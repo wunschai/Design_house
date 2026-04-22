@@ -10,14 +10,9 @@ vi.mock("./panels/Chat", () => ({
     <div data-testid="chat-panel">Chat:{projectSlug}</div>
   ),
 }));
-vi.mock("./panels/FileTree", () => ({
+vi.mock("./panels/Workspace", () => ({
   default: ({ projectSlug }: { projectSlug: string }) => (
-    <div data-testid="filetree-panel">FileTree:{projectSlug}</div>
-  ),
-}));
-vi.mock("./panels/Preview", () => ({
-  default: ({ projectSlug }: { projectSlug: string }) => (
-    <div data-testid="preview-panel">Preview:{projectSlug}</div>
+    <div data-testid="workspace-panel">Workspace:{projectSlug}</div>
   ),
 }));
 
@@ -65,13 +60,12 @@ beforeEach(() => {
 });
 
 describe("App layout", () => {
-  it("should render three panels after projects load", async () => {
+  it("should render two panels (chat + workspace) after projects load", async () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("filetree-panel")).toBeInTheDocument();
       expect(screen.getByTestId("chat-panel")).toBeInTheDocument();
-      expect(screen.getByTestId("preview-panel")).toBeInTheDocument();
+      expect(screen.getByTestId("workspace-panel")).toBeInTheDocument();
     });
   });
 

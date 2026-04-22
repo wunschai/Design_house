@@ -72,7 +72,7 @@ v0 **不**涵蓋下列（皆列於 `PRD.md` 的 Out of MVP，延到 v1+）：
 **啟動與 UI**
 - [ ] **AC-1.1**：執行啟動指令（如 `pnpm dev`）後 ≤ 5s 內，HTTP server 綁定 `127.0.0.1:31823`（或失敗時 fail-fast 並印出明確錯誤）
 - [ ] **AC-1.2**：server 僅監聽 `127.0.0.1`（`netstat` / `ss` 確認無 `0.0.0.0` 或 LAN IP）
-- [ ] **AC-1.3**：瀏覽器打開 `http://127.0.0.1:31823` 後 ≤ 3s 顯示三欄 layout：左「File Tree」、中「Chat」、右「Preview」
+- [ ] **AC-1.3**：瀏覽器打開 `http://127.0.0.1:31823` 後 ≤ 3s 顯示**雙欄** layout（對齊 Claude Design 原版）：左「Chat」、右「Workspace」(tab bar + iframe preview + 可開合的檔案抽屜)。原本 v0 初版的「三欄（File Tree / Chat / Preview）」於 M3 smoke 後因 UX 不符原版而重構為此結構。
 - [ ] **AC-1.4**：UI 啟動時若 SQLite 尚未初始化，自動建表
 
 **專案管理**
@@ -298,7 +298,14 @@ mcp-server 在啟動時由 backend 透過環境變數注入：
 
 **`correlationId` 生成規則**（見 ADR-010）：mcp-server 在發送每個 HTTP POST 前用 `ulid()` 產生新 id。Backend 對同一 id 的重複請求以 cached response 回覆（idempotent）。
 
-### 4.1 Preview iframe 的 sandbox 與 origin 規則
+### 4.1 Workspace / Preview iframe 的 sandbox 與 origin 規則
+
+**Workspace 容器**（雙欄 layout 的右欄）管理：
+1. **Tab bar**（最上）：一個 tab = 目前已開啟的檔案（HTML/其他）。CC 呼叫 `show_to_user(path)` 或 `done(path)` 會自動開 tab 並激活；使用者手動在檔案抽屜點檔也會開 tab。關閉 tab 只關「視圖」、**不刪檔案**。同一 turn 內若 CC 連續對不同 path 呼叫，會產生多個 tab。
+2. **Iframe preview**（下方主體）：渲染當前激活 tab 指向的檔案；見下方 sandbox 規則。
+3. **檔案抽屜**（tab bar 左側按鈕開合 overlay）：顯示完整檔案樹，預設收合；選檔後自動收合。原版 Claude Design 沒有常駐檔案樹，僅對話 + canvas；我方為 v0 偏離原版、給使用者直接看 FS 的能力。
+
+Iframe 規則（下列條目原本適用整個 Preview panel，現套用於 Workspace 內的 iframe）：
 
 UI 的 `<iframe>` Preview panel 載入 `http://127.0.0.1:<PORT>/api/projects/:slug/files/<path>`，必須：
 
