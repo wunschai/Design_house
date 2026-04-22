@@ -71,7 +71,9 @@
       "Bash(gh auth *)",
       "WebSearch",
       "WebFetch(domain:support.claude.com)",
-      "WebFetch(domain:muz.li)"
+      "WebFetch(domain:muz.li)",
+      "Bash(timeout 20 claude -p \"Briefly introduce yourself in one sentence. What kind of agent are you?\" --agent design-artifact --output-format stream-json --verbose)",
+      "Bash(timeout 20 claude -p \"Briefly introduce yourself in one sentence. What kind of agent are you?\" --output-format stream-json --verbose)"
     ]
   }
 }

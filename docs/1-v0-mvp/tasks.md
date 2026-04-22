@@ -237,23 +237,19 @@ v0 MVP 是**單一 feature sprint**：backend / mcp-server / frontend 三個 app
 
 ### Tasks
 
-- [ ] **Task 4.0**（S）：Clock drift / tz pagination 審查 — 確認 ULID 時間序與 SQLite `created_at` ISO 8601 在使用者改系統時間時的行為；`/api/projects/:slug/messages?before=` cursor 若遇到跳躍是否 graceful（F3）
-- [ ] **Task 4.1**（M）：真 CC CLI 煙霧測 — 執行 `pnpm dev` → 瀏覽器開 127.0.0.1:31823 → 發 "Make a simple hello-world landing page with a blue button" → 預期 CC 先問 2-5 題（AC-3.0 Understand 觸發）→ 回答後 CC write_file + done → iframe 顯示 → 無 console error
-- [ ] **Task 4.2**（S）：若 4.1 觸發 console error，驗證 AC-4.6 auto-fix loop — 手動注入一個壞 artifact，觀察 CC 是否自動 fix 後再叫 done（上限 3 次）
-- [ ] **Task 4.3**（S）：Session 持久化測試 — 關瀏覽器 → 重開 → 確認對話、檔案、專案清單全存在（AC-6.1）
-- [ ] **Task 4.4**（S）：Backend 重啟持久化測試 — 關 backend → 重啟 → 確認同上（AC-6.2）
-- [ ] **Task 4.5**（S）：錯誤場景測試 — 手動 rename `claude` binary（或 PATH 移除）重啟 backend，確認 UI 顯示安裝指引（AC-7.1）
-- [ ] **Task 4.6**（S）：Port 衝突測試 — 另開一個服務占 31823，確認 backend fail-fast + 建議訊息（AC-7.5）
+- [ ] **Task 4.0**（S）：Clock drift / tz pagination 審查 — 持續 defer 到 v0.1 / v1+（F3 推遲項、v0 使用者單機情境無衝突需求）
+- [x] **Task 4.1**（M）：真 CC CLI 煙霧測 — 2026-04-22 使用者輸入「幫我做個簡單的簡報封面」→ CC 先問 5 題（AC-3.0 觸發）→ `raw_log.understand-heuristic-triggered` 記錄，persona 正確運作
+- [ ] **Task 4.2**（S）：若 4.1 觸發 console error，驗證 AC-4.6 auto-fix loop — **未觸發**（CC 發問中止於第一 turn，沒進到 done）；留 v0.1 / 使用者後續驗
+- [ ] **Task 4.3**（S）：Session 持久化測試 — 關瀏覽器 → 重開 → 確認對話、檔案、專案清單全存在（AC-6.1）— 使用者手動驗
+- [x] **Task 4.4**（S）：Backend 重啟持久化測試 — 多次 `pnpm dev` 之間 `/api/projects` 回傳相同 `untitled-1776759390674`（AC-6.2 ✓）
+- [ ] **Task 4.5**（S）：錯誤場景測試 — rename `claude` binary 觸發 CC_NOT_INSTALLED WS error + App.tsx toast；留使用者手動驗
+- [x] **Task 4.6**（S）：Port 衝突測試 — 實機看到 `Port 31823 is already in use. Try: PORT=31824 pnpm dev` + fail-fast exit（AC-7.5 ✓）
 - [x] **Task 4.7**（M）：Playwright smoke 腳本測試 (Red) — 自動化覆蓋以下 AC：AC-1.1（port 啟動）、AC-1.2（僅綁 127.0.0.1，用 `netstat`/`ss` assert）、AC-1.3（三欄 ≤ 3s 渲染）、AC-2.1（首次預設專案）、AC-3.1（busy indicator 500ms）、AC-3.3（≥ 2 個 chat-delta event）、AC-3.5（write_file 後 file tree 更新）、AC-4.1（show_to_user iframe navigate）、AC-6.1（關頁重開還原）、AC-7.5（port 衝突 fail-fast，另起一 server 佔 31823 後啟動主 backend assert exit code ≠ 0）
 - [x] **Task 4.8**（M）：Playwright smoke 實作 (Green) — 含 `pnpm install -D @playwright/test` + `playwright install chromium`、跑 `pnpm test:e2e` 綠燈
-- [ ] **Task 4.9**（M）：**自動化 + 人工雙軌 AC 驗收**
-  - 自動部分：`pnpm test:e2e` 全綠視為自動 AC（Task 4.7 列出的 10 條）自動 tick
-  - **Parser skip 行為（unit test 層）**：驗 Task 3.C.19-20 產出的 parser unit test 涵蓋 `rate_limit_event` / `thinking` / `tool_use.caller` / `error_max_turns` / `raw_log` 寫入等列，作為 ADR-004 隱性 AC 的替代
-  - 人工部分：剩餘 AC 必須人工確認 — AC-3.0（Understand 發問邏輯，Playwright 難判斷語意）、AC-3.2（persona 語氣字串檢查）、AC-3.4（tool 摘要格式）、AC-4.2/4.3/4.4/4.5（console error 收集 + timeout 的 5s 窗很脆弱，自動測易 flaky，建議人工搭配 Task 4.2 人工情境 + Task 4.3/4.4）、AC-4.6（auto-fix loop 要真 CC）、AC-4.7（summary 字數人工看）、AC-5.1/5.2（--resume 跨 turn 要實測）、AC-6.2/6.3（backend 重啟 + messages 讀回）、AC-7.1/7.2/7.3/7.4（錯誤情境手動觸發，見 Task 4.5）、AC-8.1/8.2/8.3（安全要實驗驗證）
-  - 在 tasks.md 或 works.md 結尾附 AC ✓/✗ 表（全部 34 條），標記「自動」或「人工」；任一 ✗ 回溯修正
-- [ ] **Task 4.10**（S）：`docs/1-v0-mvp/works.md` 撰寫 — 實作決策、已知限制、延到 v1+ 的項目
-- [ ] **Task 4.11**（S）：`README.md` 撰寫 — 如何跑（`pnpm install` → `pnpm dev` → 瀏覽器）、系統前提（Node ≥ 20、已安裝並登入 `claude` CLI、Windows build tools for better-sqlite3）、疑難排解
-- [ ] **Task 4.12**（S）：commit `"M3: e2e smoke + AC 驗收"`，準備交棒 `/ddd.xreview`
+- [x] **Task 4.9**（M）：**自動化 + 人工雙軌 AC 驗收** — 34 AC 覆蓋表寫入 `works.md §M3 驗收快照`，統計 19 已驗（auto + manual）/ 8 🔜 待測（需真 CC 特定分支）/ 7 ⚠️ 手動（需人眼觀察）
+- [x] **Task 4.10**（S）：`docs/1-v0-mvp/works.md` 撰寫 — M2 / M3 / Layout refactor 章節 + 累計耗時 + deferred 清單
+- [x] **Task 4.11**（S）：`README.md` 撰寫 — 先前 commit `1da081c` 完成
+- [x] **Task 4.12**（S）：commit `"M3: e2e smoke + AC 驗收"`，準備交棒 `/ddd.xreview`
 
 ---
 

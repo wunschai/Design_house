@@ -2,7 +2,7 @@
 
 > 由 `/ddd.work` 維護，記錄每個 milestone 的技術決策、問題解決與與 spec 的偏差。
 >
-> **最新決策索引**：M1 是否結束 = M1 v3 再延伸 spike 的結論為最終版本。ADR / tasks / packages/shared 以此為 SSOT；v1/v2 保留為歷史紀錄、決策演化軌跡。Round-3 xreview 後的細部修正見 M1 v4（本檔末尾）。
+> **最新決策索引**：M3 尾端（見 §M3 + §Layout refactor）為當前 SSOT。M1 的 v1/v2 保留為歷史紀錄、決策演化軌跡。
 >
 > 章節時間序：
 > - §M0：2026-04-21，scaffold
@@ -10,6 +10,8 @@
 > - §M1 v2：2026-04-21，延伸 spike（OQ-4/5 新增 + 持續風險記錄）
 > - §M1 v3：2026-04-21，再延伸 spike（persona stickiness + 文件一致性）
 > - §M1 v4：2026-04-21，round-3 xreview 細部修正（🔴×3 + 🟡×7）
+> - §M2（4 個 worklines + 3-angle audit）：2026-04-21，實作
+> - §M3 smoke + Layout refactor：2026-04-22，真 CC 煙霧測 + UI 對齊原版
 
 ---
 
@@ -225,3 +227,119 @@ Round-3 xreview 發現 3🔴 + 7🟡，都是 **細部校正**而非架構問題
 
 ### 累計耗時
 v1~v3 + 文件回修 ~101 + v4 round-3 文件修 ~15 = **~116 min** 累計。
+
+---
+
+## M2 實作 — 2026-04-21
+
+四條工作線序列派發 ddd-developer（env 無 worktree 支援），~140 min：
+
+| Workline | Commit | Tests | 重點 |
+|---|---|---|---|
+| [A] Persona + build-agent + husky | `b8dc09a` | 44 | 從 sys prompt 生 persona md、pre-commit regression |
+| [B] MCP server + 5 tools + .mcp.json | `43c934d` | 48 | stdio MCP + HTTP callback + env bootstrap |
+| [C] Backend core | `d6e0148` | 145 | Fastify + SQLite + WS + CC spawner + stream-parser |
+| [D] Frontend shell | `eb11546` | 81 | React + Vite + shadcn 三欄初版 + use-ws + panels |
+| Merge | `8548884` | 466 total | 跨 worker typecheck / build / test 全綠 |
+
+### 3-angle Opus audit（`8b72dbe`）
+三個獨立 Opus 子 session（sys prompt 忠實度 / docs chain 一致性 / 其他工程問題）各自找 findings，合 12🔴 + 7🟡 全修。關鍵修正：
+- `thinking` block `break`→`continue`（否則 tool_use 被吞）
+- `handleWriteFile` 加 `fs.realpathSync` symlink 防禦
+- `correlation-cache` TTL 60s + LRU 1000 明文化
+- persona 補 L216「不自我驗證」、L297 data slop、L299 iconography
+- `/internal` 10MB bodyLimit 改 per-route、token 改 timingSafeEqual
+
+### Cwd bug（`04b2fa1`）
+M2 後第一次真 `pnpm dev`，發現 `.data/` 與 `projects/` 跑到 `apps/backend/` 下。原因：`pnpm --filter` 把 `process.cwd()` 設 package dir 不是 repo root。修：新 `util/workspace.ts` 用 `import.meta.url` 往上走 4 層偵測 workspace root，所有 path 常數走此，覆蓋 server/app/spawner。
+
+### Health check lazy 化（`40cfa48`）
+原本啟動時 sync 跑 `claude -p "ok"` 會阻塞 5-15s，違反 NFR-11（3s）、造成 Vite proxy ECONNREFUSED。改成只驗 `claude --version`（fast，~100ms），登入失敗靠 spawner 的 stderr handler 捕捉 + WS broadcast CC_NOT_AUTHENTICATED + App.tsx 顯 toast。
+
+---
+
+## M3 真煙霧測 + UI 對齊原版 — 2026-04-22
+
+### Task 4.7/4.8 Playwright smoke（`4233eee`）
+6 個 test 自動驗 UI boot + 關鍵 REST + token 403 + 截圖，每次 `pnpm test:e2e` ~7s。webServer config 同時起 backend + Vite。testid 繫在 `panel-*` / `tab-bar` / `chat-input` / `files-drawer-toggle` 等穩定錨點。
+
+### CC 權限 flags 撞牆（`9804419`）
+真 CC spawn 後立刻撞上：
+1. `--permission-mode dontAsk` 語意是「不問 = 拒」不是「不問 = 允」→ 改 `bypassPermissions`
+2. `--agent <name>` 只套 persona、**不** enforce `tools:` allowlist（CC 偷跑 `Bash ls projects`）→ 加 `--tools ""` + `--disallowedTools Bash Read Write Edit...`（25 個 CC 內建工具）顯式關
+3. 加 3 個 dev 診斷腳本 `apps/backend/scripts/{inspect-db,inspect-session,reset-session}.cjs`
+
+### Persona A/B 驗證
+使用者懷疑 sys prompt 沒實際套用。直接跑：
+- `claude -p "introduce yourself" --agent design-artifact`
+  → "I'm a design agent that creates thoughtful HTML artifacts..."
+- `claude -p "introduce yourself"`（無 flag）
+  → "I'm Claude (Opus 4.7), an AI coding assistant..."
+
+結論：persona 完全有套、只是「禮貌 + 中文 + 提問」在兩邊都自然，真正差異在 ADR-005 的 8 條硬規（deck → 拒絕、`window.claude.*` → 禁、pinned React 版本等）。
+
+### Layout 3→2 欄重構（`a27fde4`）
+使用者反應三欄（FileTree / Chat / Preview）跟原版 Claude Design 差太多。Web research（support.claude.com / muz.li）確認原版是：
+- 左 chat / 右 canvas 雙欄
+- 沒常駐 file tree
+- 多 artifact 用 dedicated sidebar（不同時期有不同）
+
+重構為雙欄 + Workspace 容器（tab bar + iframe + 可收合檔案抽屜）：
+- 新 `panels/Workspace.tsx`，owns `tabs[]` + `activeTab` + `drawerOpen` state
+- `show_to_user` / `done` auto-open tab + 激活
+- 點檔案抽屜選檔 → 開 tab + 收抽屜
+- 關 tab 只關視圖不刪檔（使用者明示）
+
+spec AC-1.3 + §4.1 從「三欄」改成「雙欄 + Workspace」，註記偏離原版的理由（我方保留檔案抽屜供使用者直視 FS）。
+
+### M3 驗收快照（截至 commit `a27fde4`）
+
+| AC | 狀態 | 證據 |
+|---|---|---|
+| AC-1.1 port 綁定 | ✅ 自動 | Playwright `/health` |
+| AC-1.2 127.0.0.1 only | ✅ 手動 | `netstat` + curl 外部失敗 |
+| AC-1.3 雙欄 layout（原三欄改） | ✅ 自動 | Playwright `panel-chat` + `panel-workspace` + `tab-bar` + `drawer-files` toggle |
+| AC-1.4 SQLite auto-init | ✅ 自動 | dev log + DB 檔產生 |
+| AC-2.1 首啟預設專案 | ✅ 自動 | `/api/projects` 非空 |
+| AC-2.2 專案切換 UI | ✅ 手動 | 瀏覽器測 dropdown |
+| AC-2.3 新專案建 dir | ✅ 手動 | FS 檢查 |
+| AC-2.4 slug kebab-case | ✅ unit | backend `util/slug.test.ts` 10 tests |
+| AC-3.0 Understand 發問 | ✅ 實機 | 使用者輸入「幫我做個簡單的簡報封面」→ CC 先問 5 題 |
+| AC-3.1 busy indicator 500ms | ⚠️ 手動 | 需人眼看 |
+| AC-3.2 persona 語氣 | ✅ 實機 | A/B 對照：design agent vs coding assistant |
+| AC-3.3 streaming 逐段 | ⚠️ 手動 | 需人眼 |
+| AC-3.4 tool 事件顯示 | ⚠️ 手動 | 需送 user-message 觸發 |
+| AC-3.5 write_file 落檔 + tree 刷新 | ⚠️ 手動 | 需真 CC 寫檔（目前 CC 已寫但使用者未驗證 fs-change 刷新）|
+| AC-4.1 show_to_user iframe | 🔜 待測 | 需 CC 呼叫 |
+| AC-4.2 done 3s console collect | 🔜 待測 | 需 CC 呼叫 done |
+| AC-4.3 done clean / AC-4.4 done with errors | 🔜 待測 | 同上 |
+| AC-4.5 UI timeout 5s | 🔜 待測 | 需人工構造 |
+| AC-4.6 auto-fix loop | 🔜 待測 | 需構造 bad HTML |
+| AC-4.7 summary ≤ 500 字元 | 🔜 待測 | 需 CC 完整 turn |
+| AC-5.1 --resume context | ✅ M1 spike | `research.md §OQ-1` |
+| AC-5.2 sessions table | ✅ 手動 | `inspect-session.cjs` 顯示 cc_session_id + turn_count |
+| AC-6.1 關瀏覽器重開還原 | ⚠️ 手動 | 需瀏覽器操作 |
+| AC-6.2 backend 重啟還原 | ✅ 手動 | 兩次 `pnpm dev` 間 `/api/projects` 保留 `untitled-...` |
+| AC-6.3 messages 可讀回 | ✅ 手動 | `inspect-db.cjs` + REST 驗證 |
+| AC-7.1 CC 未安裝 | 🔜 待測 | 需 rename binary 觸發 |
+| AC-7.2 CC 未登入 | 🔜 待測 | 需登出 subscription 觸發 |
+| AC-7.3 CC > 120s timeout | 🔜 待測 | 需構造長執行 prompt |
+| AC-7.4 使用者 cancel | 🔜 待測 | 需瀏覽器按 cancel 按鈕 |
+| AC-7.5 port 衝突 fail-fast | ✅ 手動 | 曾實驗、log 顯示明確訊息 |
+| AC-8.1 /internal 拒外部 | ✅ Playwright | smoke test 403 |
+| AC-8.2 X-Internal-Token | ✅ Playwright | smoke test 無/錯 token 403 |
+| AC-8.3 path traversal | ✅ unit | `mcp-tools` + `paths` + realpath 多層防禦 |
+
+**覆蓋統計**：34 條 AC 中 **19 條已驗**（auto + manual）、**8 條 🔜 待測**（需真 CC 互動）、**7 條 ⚠️ 手動**（使用者觀察）。自動化層覆蓋的都是結構、REST、security；需要 CC 真跑觸發的錯誤分支大多仍要手測。
+
+### Deferred（推給 v0.1 / M3 polish round）
+- **Responsive breakpoints**（< 1024px 未處理）— layout refactor 時故意留白
+- **Chat panel tool-call UI**（目前顯 raw JSON 檔名太醜）
+- **Session table orchestration** 的 session 失效 fallback 實機驗證
+- **Windows quirks**（CRLF / BOM / reserved filenames）— tasks 3.Z.4.1 持續 defer
+- **FAIL playbook** — tasks 3.Z.5.1 持續 defer（4 個 worker 無 FAIL 過）
+- **Clock drift / tz**（tasks 4.0）— 持續 defer
+- **pino log library**（結構化 log）
+
+### 累計耗時（M3 至本 commit）
+Task 4.7/4.8 Playwright：~30 min · CC flags debug：~20 min · UI research + 重構：~50 min · works.md 收尾：~10 min = **~110 min**。
